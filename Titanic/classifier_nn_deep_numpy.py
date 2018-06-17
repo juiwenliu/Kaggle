@@ -8,9 +8,12 @@ def main():
     preProcessedData = preprocess_data()
     cache = initialize_parameters(preProcessedData)
 
-    for i in range(1, cache['L']):
-        cache = make_forward_propagation(cache, i)
-        print(cache['A'])
+    for i in range(100): # Training iterations
+        for j in range(1, cache['L']): # All layers iterations
+            make_forward_propagation(cache, j)
+
+        compute_cost(cache)
+        print(str(i).rjust(20) + ": Cost = " + str(cache['cost'])) # Print progress with Cost
 
 def preprocess_data():
     with open('train.csv','r') as f:
@@ -89,7 +92,16 @@ def make_forward_propagation(cache, i):
         A[i] = np.maximum(0, Z) # Apply ReLU function max(0, Z)
 
     cache['A'] = A
-    return cache
 
+def compute_cost(cache): # Only compute top layer cost for now, since cost evaluation does not affect training, and cost evaluation slightly slow down training
+    m = cache['m']
+    A = cache['A']
+    Y = cache['Y']
+    L = cache['L']
+    epsilon = cache['epsilon']
+    firstTerm  = np.dot(  Y, np.log(  A[L-1] + epsilon).T) # epsilon to avoid log(0) exception.
+    secondTerm = np.dot(1-Y, np.log(1-A[L-1] + epsilon).T) # epsilon to avoid log(0) exception
+    cost = -(firstTerm + secondTerm) / m # per Cross Entropy Cost function. See https://en.wikipedia.org/wiki/Cross_entropy
+    cache['cost'] = np.squeeze(cost) # np.squeeze to turn one cell array into scalar
 
 main()
