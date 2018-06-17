@@ -1,12 +1,15 @@
 import copy
 from io import StringIO
+import matplotlib.pyplot as plt
 import numpy as np
 import re
 
 def main():
     preProcessedData = preprocess_data()
     cache = initialize_parameters(preProcessedData)
-    forward_propagation(cache)
+    cache = make_forward_propagation(cache)
+    evaluate_cost(cache)
+    cache = make_backward_propagation(cache)
 
 def preprocess_data():
     with open('train.csv','r') as f:
@@ -30,7 +33,7 @@ def initialize_parameters(preProcessedData):
     ny = 1 # Output layer unit count
     w = np.random.randn(ny, nx) * 0.01 # Randomly initializing neuros. Factor 0.01 is to ensure the starting parameter to be small
     b = np.zeros((ny, 1)) # Initialize bias to zeros
-    Z = np.zeros((ny, m)) # Initialize output to zeros
+    A = np.zeros((ny, m)) # Initialize output to zeros
 
     cache = {
         'X': X,
@@ -40,7 +43,7 @@ def initialize_parameters(preProcessedData):
         'ny': ny,
         'w': w,
         'b': b,
-        'Z': Z
+        'A': A
     }
 
     print('X: ' + str(X.shape))
@@ -50,15 +53,35 @@ def initialize_parameters(preProcessedData):
     print('ny: ' + str(ny))
     print('w: ' + str(w.shape))
     print('b: ' + str(b.shape))
-    print('Z: ' + str(Z.shape))
-
+    print('A: ' + str(A.shape))
     return cache
 
-def forward_propagation(cache):
+def make_forward_propagation(cache):
     w = cache['w']
     X = cache['X']
     b = cache['b']
-    cache['Z'] = np.dot(w, X) + b
+    Z = np.dot(w, X) + b
+
+    cache['A'] = np.reciprocal(1 + np.exp(-Z)) # Apply sigmoid function 1 / (1 + e^-Z)
+    return cache
+
+def evaluate_cost(cache):
+    m = cache['m']
+    A = cache['A']
+    Y = cache['Y']
+    cost = np.squeeze(-(np.dot(Y, np.log(A).T) + np.dot(1-Y, np.log(1-A).T))) / m
+    print('Cost = ' + str(cost))
+
+def make_backward_propagation(cache):
+    A = cache['A']
+    w = cache['w']
+    X = cache['X']
+    Y = cache['Y']
+    m = cache['m']
+
+    dZ = A - Y
+    dw = np.dot(dZ, X.T) / m
+    db = np.sum(dZ, axis=1, keepdims=True) / m
     return cache
 
 main()
