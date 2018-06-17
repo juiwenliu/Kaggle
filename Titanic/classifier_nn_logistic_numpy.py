@@ -7,9 +7,15 @@ import re
 def main():
     preProcessedData = preprocess_data()
     cache = initialize_parameters(preProcessedData)
-    cache = make_forward_propagation(cache)
-    evaluate_cost(cache)
-    cache = make_backward_propagation(cache)
+
+    for i in range(100):
+        cache = make_forward_propagation(cache)
+        compute_cost(cache)
+        cache = make_backward_propagation(cache)
+        cache = update_parameters(cache)
+
+    print(cache['w'])
+    print(cache['b'])
 
 def preprocess_data():
     with open('train.csv','r') as f:
@@ -21,19 +27,21 @@ def preprocess_data():
     preProcessedData[:, 4] = (preProcessedData[:, 4] == 'male').astype(int) # In Sex column, male/female converted to 1/0, respectively
     preProcessedData[:, 10] = (preProcessedData[:, 10] != '').astype(int) # In Cabin column, with/without data converted to 1/0, respectively
     preProcessedData = preProcessedData[np.where(preProcessedData[:, 5] != '')] # Drop rows without data in Age column
-    preProcessedData = preProcessedData[:, [0, 1, 2, 4, 5, 6, 7, 9, 10]] # Pick selected 8 columns for training
+    preProcessedData = preProcessedData[:, [1, 2, 4, 5, 6, 7, 9, 10]] # Pick selected 8 columns for training (has to drop column 0 because huge numbers (for example, 891) will easily overflow the sigmoid evaluation)
     preProcessedData = preProcessedData.astype(np.float) # Convert all cells to float
     return preProcessedData
 
 def initialize_parameters(preProcessedData):
-    X = copy.deepcopy(preProcessedData[:, [0, 2, 3, 4, 5, 6, 7, 8]]).T # Make deep copy to avoid corrupting raw data
-    Y = copy.deepcopy(preProcessedData[:, 1]).reshape(X.shape[1], -1).T # Make deep copy to avoid corrupting raw data. Reshape to address rank-1 array issue
+    X = copy.deepcopy(preProcessedData[:, [1, 2, 3, 4, 5, 6, 7]]).T # Make deep copy to avoid corrupting raw data
+    Y = copy.deepcopy(preProcessedData[:, 0]).reshape(X.shape[1], -1).T # Make deep copy to avoid corrupting raw data. Reshape to address rank-1 array issue
     m = X.shape[1] # Training Set count
     nx = X.shape[0] # Feature count
     ny = 1 # Output layer unit count
     w = np.random.randn(ny, nx) * 0.01 # Randomly initializing neuros. Factor 0.01 is to ensure the starting parameter to be small
     b = np.zeros((ny, 1)) # Initialize bias to zeros
     A = np.zeros((ny, m)) # Initialize output to zeros
+    alpha = 0.001
+    epsilon = 0.000000001
 
     cache = {
         'X': X,
@@ -43,7 +51,9 @@ def initialize_parameters(preProcessedData):
         'ny': ny,
         'w': w,
         'b': b,
-        'A': A
+        'A': A,
+        'alpha': alpha,
+        'epsilon': epsilon
     }
 
     print('X: ' + str(X.shape))
@@ -65,11 +75,11 @@ def make_forward_propagation(cache):
     cache['A'] = np.reciprocal(1 + np.exp(-Z)) # Apply sigmoid function 1 / (1 + e^-Z)
     return cache
 
-def evaluate_cost(cache):
+def compute_cost(cache):
     m = cache['m']
     A = cache['A']
     Y = cache['Y']
-    cost = np.squeeze(-(np.dot(Y, np.log(A).T) + np.dot(1-Y, np.log(1-A).T))) / m
+    cost = np.squeeze(-(np.dot(Y, np.log(A + cache['epsilon']).T) + np.dot(1-Y, np.log(1-A + cache['epsilon']).T))) / m
     print('Cost = ' + str(cost))
 
 def make_backward_propagation(cache):
@@ -80,8 +90,13 @@ def make_backward_propagation(cache):
     m = cache['m']
 
     dZ = A - Y
-    dw = np.dot(dZ, X.T) / m
-    db = np.sum(dZ, axis=1, keepdims=True) / m
+    cache['dw'] = np.dot(dZ, X.T) / m
+    cache['db'] = np.sum(dZ, axis=1, keepdims=True) / m
+    return cache
+
+def update_parameters(cache):
+    cache['w'] -= cache['alpha'] * cache['dw']
+    cache['b'] -= cache['alpha'] * cache['db']
     return cache
 
 main()
