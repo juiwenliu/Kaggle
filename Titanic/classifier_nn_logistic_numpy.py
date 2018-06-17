@@ -8,14 +8,17 @@ def main():
     preProcessedData = preprocess_data()
     cache = initialize_parameters(preProcessedData)
 
-    for i in range(100):
+    for i in range(10000000):
         cache = make_forward_propagation(cache)
         compute_cost(cache)
         cache = make_backward_propagation(cache)
         cache = update_parameters(cache)
+        if (np.remainder(i, 100000) == 0):
+            print(str(i) + ": Cost = " + str(cache['Cost']))
 
-    print(cache['w'])
-    print(cache['b'])
+    # print('w: ' + str(cache['w']))
+    # print('b: ' + str(cache['b']))
+    predict(cache)
 
 def preprocess_data():
     with open('train.csv','r') as f:
@@ -79,8 +82,7 @@ def compute_cost(cache):
     m = cache['m']
     A = cache['A']
     Y = cache['Y']
-    cost = np.squeeze(-(np.dot(Y, np.log(A + cache['epsilon']).T) + np.dot(1-Y, np.log(1-A + cache['epsilon']).T))) / m
-    print('Cost = ' + str(cost))
+    cache['Cost'] = np.squeeze(-(np.dot(Y, np.log(A + cache['epsilon']).T) + np.dot(1-Y, np.log(1-A + cache['epsilon']).T))) / m
 
 def make_backward_propagation(cache):
     A = cache['A']
@@ -99,4 +101,20 @@ def update_parameters(cache):
     cache['b'] -= cache['alpha'] * cache['db']
     return cache
 
+def predict(cache):
+    w = np.array([[-1.04715365, -2.63982776, -0.0442185110, -0.374088222, -0.0682812830, 0.00147806903, 0.567604116]])
+    b = np.array([[4.84586073]])
+    X = cache['X']
+    Y = cache['Y']
+    m = cache['m']
+    # print(w.shape)
+    # print(b.shape)
+
+    print(np.sum((np.abs(np.abs(np.reciprocal(1 + np.exp(-(np.dot(w, X) + b)))) - Y) < 0.5).astype(int)) / float(m))
+
 main()
+
+# After 10000000 training iterations:
+# w: [[-1.04715365e+00 -2.63982776e+00 -4.42185110e-02 -3.74088222e-01
+#   -6.82812830e-02  1.47806903e-03  5.67604116e-01]]
+# b: [[4.84586073]]
