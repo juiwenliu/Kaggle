@@ -8,16 +8,17 @@ def main():
     preProcessedData = preprocess_data()
     cache = initialize_parameters(preProcessedData)
 
-    for i in range(10000000):
+    for i in range(100000):
         cache = make_forward_propagation(cache)
         compute_cost(cache)
         cache = make_backward_propagation(cache)
         cache = update_parameters(cache)
-        if (np.remainder(i, 100000) == 0):
-            print(str(i) + ": Cost = " + str(cache['Cost']))
 
-    # print('w: ' + str(cache['w']))
-    # print('b: ' + str(cache['b']))
+        if (np.remainder(i, 10000) == 0):
+            print(str(i) + ": Cost = " + str(cache['cost'])) # Print progress with Cost
+
+    print('w: ' + str(cache['w'])) # Final w is what's needed for prediction
+    print('b: ' + str(cache['b'])) # Final w is what's needed for prediction
     predict(cache)
 
 def preprocess_data():
@@ -40,11 +41,11 @@ def initialize_parameters(preProcessedData):
     m = X.shape[1] # Training Set count
     nx = X.shape[0] # Feature count
     ny = 1 # Output layer unit count
-    w = np.random.randn(ny, nx) * 0.01 # Randomly initializing neuros. Factor 0.01 is to ensure the starting parameter to be small
+    w = np.random.randn(ny, nx) * 0.01 # Randomly initializing neuros. Factor 0.01 is to ensure the starting parameter to be small to stay on linear zone (crucial for gradiant decent on sigmoid)
     b = np.zeros((ny, 1)) # Initialize bias to zeros
     A = np.zeros((ny, m)) # Initialize output to zeros
-    alpha = 0.001
-    epsilon = 0.000000001
+    alpha = 0.001 # learning rate higher than 0.005 will easily overshoot
+    epsilon = 0.000000001 # For divide-by-zero prevention
 
     cache = {
         'X': X,
@@ -73,7 +74,7 @@ def make_forward_propagation(cache):
     w = cache['w']
     X = cache['X']
     b = cache['b']
-    Z = np.dot(w, X) + b
+    Z = np.dot(w, X) + b # Z = WX + B
 
     cache['A'] = np.reciprocal(1 + np.exp(-Z)) # Apply sigmoid function 1 / (1 + e^-Z)
     return cache
@@ -82,7 +83,10 @@ def compute_cost(cache):
     m = cache['m']
     A = cache['A']
     Y = cache['Y']
-    cache['Cost'] = np.squeeze(-(np.dot(Y, np.log(A + cache['epsilon']).T) + np.dot(1-Y, np.log(1-A + cache['epsilon']).T))) / m
+    firstTerm = np.dot(Y,   np.log(A   + cache['epsilon']).T) # epsilon to avoid log(0) exception
+    secondTerm = np.dot(1-Y, np.log(1-A + cache['epsilon']).T) # epsilon to avoid log(0) exception
+    cost = -(firstTerm + secondTerm) / m # per Cross Entropy Cost function. See https://en.wikipedia.org/wiki/Cross_entropy
+    cache['cost'] = np.squeeze(cost) # np.squeeze to turn one cell array into scalar
 
 def make_backward_propagation(cache):
     A = cache['A']
@@ -114,7 +118,7 @@ def predict(cache):
 
 main()
 
-# After 10000000 training iterations:
+# After 10,000,000 training iterations:
 # w: [[-1.04715365e+00 -2.63982776e+00 -4.42185110e-02 -3.74088222e-01
 #   -6.82812830e-02  1.47806903e-03  5.67604116e-01]]
 # b: [[4.84586073]]
