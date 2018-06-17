@@ -7,7 +7,10 @@ import re
 def main():
     preProcessedData = preprocess_data()
     cache = initialize_parameters(preProcessedData)
-    # cache = make_forward_propagation(cache)
+
+    for i in range(1, cache['L']):
+        cache = make_forward_propagation(cache, i)
+        print(cache['A'])
 
 def preprocess_data():
     with open('train.csv','r') as f:
@@ -36,12 +39,12 @@ def initialize_parameters(preProcessedData):
     L = len(N) # neural network layers count
     W = [np.array([])] # empty array serves as dummy item
     B = [np.array([])] # empty array serves as dummy item
-    A = [np.array([])] # empty array serves as dummy item
-    alpha = 0.001
+    A = [X] # X is regarded as A0
+    alpha = 0.001 # Learning rate
     epsilon = 0.000000001 # For divide-by-zero prevention
 
     for i in range(1, L):
-        W.append(np.random.randn(N[i], N[i-1]))
+        W.append(np.random.randn(N[i], N[i-1]) * 0.01) # Randomly initializing neuros. Factor 0.01 is to ensure the starting parameter to be small to stay on linear zone (crucial for gradiant decent on sigmoid)
         B.append(np.zeros((N[i], 1)))
         A.append(np.zeros((N[i], m)))
 
@@ -73,6 +76,20 @@ def initialize_parameters(preProcessedData):
     print('epsilon: ' + str(epsilon))
     return cache
 
+def make_forward_propagation(cache, i):
+    W = cache['W']
+    A = cache['A']
+    B = cache['B']
+    Z = np.dot(W[i], A[i-1]) + B[i] # Z_l = W_l * A_l-1 + B_l
+    L = cache['L']
+
+    if(i == (L - 1)):
+        A[i] = np.reciprocal(1 + np.exp(-Z)) # Apply sigmoid function 1 / (1 + e^-Z)
+    else:
+        A[i] = np.maximum(0, Z) # Apply ReLU function max(0, Z)
+
+    cache['A'] = A
+    return cache
 
 
 main()
