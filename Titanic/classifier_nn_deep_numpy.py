@@ -5,13 +5,23 @@ import numpy as np
 import re
 
 def main():
-    preProcessedData = preprocess_data()
-    cache = initialize_parameters(preProcessedData)
+    X, Y = preprocess_data()
+    cache = initialize_parameters(X, Y)
+    print("Iterations Cost") # Print progress with Cost
+    print("-----------------------------") # Print progress with Cost
 
     for i in range(cache['iterationsCount']): # Training iterations
         make_forward_propagation(cache)
         compute_cost(cache)
-        print(str(i).rjust(10) + ": Cost = " + str(cache['cost'])) # Print progress with Cost
+
+        if (np.remainder(i, 1000) == 0):
+            print(str(i).rjust(10) + " " + str(cache['cost'])) # Print progress with Cost
+        
+        make_backward_propagation(cache)
+        update_parameters(cache)
+    
+    print(cache['W'])
+    print(cache['B'])
 
 def preprocess_data():
     with open('train.csv','r') as f:
@@ -25,29 +35,37 @@ def preprocess_data():
     preProcessedData = preProcessedData[np.where(preProcessedData[:, 5] != '')] # Drop rows without data in Age column
     preProcessedData = preProcessedData[:, [1, 2, 4, 5, 6, 7, 9, 10]] # Pick selected 8 columns for training (has to drop column 0 because huge numbers (for example, 891) will easily overflow the sigmoid evaluation)
     preProcessedData = preProcessedData.astype(np.float) # Convert all cells to float
-    return preProcessedData
-
-def initialize_parameters(preProcessedData):
+    
     X = copy.deepcopy(preProcessedData[:, [1, 2, 3, 4, 5, 6, 7]]).T # Make deep copy to avoid corrupting raw data
     Y = copy.deepcopy(preProcessedData[:, 0]).reshape(X.shape[1], -1).T # Make deep copy to avoid corrupting raw data. Reshape to address rank-1 array issue
+    return X, Y
+
+def initialize_parameters(X, Y):
     m = X.shape[1] # Training Set count
     N = [
         X.shape[0], # Feature count
-        5, # Layer 1 neural unit count
-        4, # Layer 2 neural unit count
+        64, # Layer 1 neural unit count
+        16, # Layer 1 neural unit count
+        8, # Layer 1 neural unit count
         1  # Layer 3 neural unit (output) count
     ]
     L = len(N) - 1 # neural network layers count. Minus one to exclude input layer
     W = [np.array([])] # empty array serves as dummy item
     B = [np.array([])] # empty array serves as dummy item
+    dW = [np.array([])] # empty array serves as dummy item
+    dB = [np.array([])] # empty array serves as dummy item
+    Z = [np.array([])] # empty array serves as dummy item
     A = [X] # X is regarded as A0
-    alpha = np.power(10., -3) # Learning rate
+    alpha = 5 * np.power(10., -3) # Learning rate
     epsilon = np.power(10., -10) # For divide-by-zero prevention and gradiant checking
-    iterationsCount = 10
+    iterationsCount = 3000000
 
     for i in range(1, L+1):
         W.append(np.random.randn(N[i], N[i-1]) * np.power(10., -2)) # Randomly initializing neuros. Factor 0.01 is to ensure the starting parameter to be small to stay on linear zone (crucial for gradiant decent on sigmoid)
         B.append(np.zeros((N[i], 1)))
+        dW.append(np.zeros((N[i], N[i-1])))
+        dB.append(np.zeros((N[i], 1)))
+        Z.append(np.zeros((N[i], m)))
         A.append(np.zeros((N[i], m)))
 
     cache = {
@@ -58,6 +76,9 @@ def initialize_parameters(preProcessedData):
         'L': L,
         'W': W,
         'B': B,
+        'dW': dW,
+        'dB': dB,
+        'Z': Z,
         'A': A,
         'alpha': alpha,
         'epsilon': epsilon,
@@ -73,6 +94,9 @@ def initialize_parameters(preProcessedData):
     for i in range(L+1):
         print('W' + str(i) + ': ' + str(W[i].shape))
         print('B' + str(i) + ': ' + str(B[i].shape))
+        print('dW' + str(i) + ': ' + str(dW[i].shape))
+        print('dB' + str(i) + ': ' + str(dB[i].shape))
+        print('Z' + str(i) + ': ' + str(Z[i].shape))
         print('A' + str(i) + ': ' + str(A[i].shape))
     
     print('alpha: ' + str(alpha))
@@ -80,18 +104,20 @@ def initialize_parameters(preProcessedData):
     return cache
 
 def make_forward_propagation(cache):
+    L = cache['L']
     W = cache['W']
     A = cache['A']
     B = cache['B']
-    L = cache['L']
+    Z = cache['Z']
 
-    for i in range(1, L): # All hidden layers (Layer 1 ~ L-1)
-        Z = np.dot(W[i], A[i-1]) + B[i] # Z_l = W_l * A_l-1 + B_l
-        A[i] = np.maximum(0, Z) # Apply ReLU function max(0, Z)
+    for i in range(1, L): # For all hidden layers (Layer 1 ~ L-1)
+        Z[i] = np.dot(W[i], A[i-1]) + B[i] # Z_l = W_l * A_l-1 + B_l
+        A[i] = np.maximum(0, Z[i]) # Apply ReLU function max(0, Z)
 
-    # Output layer (Layer L)
-    Z = np.dot(W[L], A[L-1]) + B[L] # Z_L = W_L * A_L-1 + B_L
-    A[L] = np.reciprocal(1 + np.exp(-Z)) # Apply sigmoid function 1 / (1 + e^-Z)
+    # For output layer (Layer L)
+    Z[L] = np.dot(W[L], A[L-1]) + B[L] # Z_L = W_L * A_L-1 + B_L
+    A[L] = np.reciprocal(1 + np.exp(-Z[L])) # Apply sigmoid function 1 / (1 + e^-Z)
+    cache['Z'] = Z
     cache['A'] = A
 
 def compute_cost(cache): # Only compute top layer cost
@@ -100,24 +126,51 @@ def compute_cost(cache): # Only compute top layer cost
     Y = cache['Y']
     L = cache['L']
     epsilon = cache['epsilon']
-    firstTerm  = np.dot(  Y, np.log(  A[L] + epsilon).T) # epsilon to avoid log(0) exception.
-    secondTerm = np.dot(1-Y, np.log(1-A[L] + epsilon).T) # epsilon to avoid log(0) exception
+    firstTerm  = np.dot(  Y, np.log(  A[L]+epsilon).T) # epsilon to avoid log(0) exception.
+    secondTerm = np.dot(1-Y, np.log(1-A[L]+epsilon).T) # epsilon to avoid log(0) exception
     cost = -(firstTerm + secondTerm) / m # per Cross Entropy Cost function. See https://en.wikipedia.org/wiki/Cross_entropy
     cache['cost'] = np.squeeze(cost) # np.squeeze to turn one cell array into scalar
 
-# def make_backward_propagation(cache, i):
-#     A = cache['A']
-#     w = cache['w']
-#     X = cache['X']
-#     Y = cache['Y']
-#     m = cache['m']
+def make_backward_propagation(cache):
+    grads = {}
+    A = cache['A']
+    L = cache['L']
+    m = cache['m']
+    Y = cache['Y']
+    Z = cache['Z']
+    W = cache['W']
+    dW = cache['dW']
+    dB = cache['dB']
+    epsilon = cache['epsilon']
+	
+    dAL = -np.divide(Y, A[L]+epsilon) + np.divide(1-Y, 1-A[L]+epsilon)
+    s = 1/(1+np.exp(-Z[L]))
+    dZ = dAL * s * (1-s)
+    dW[L] = np.dot(dZ, A[L-1].T) / m
+    dB[L] = np.sum(dZ, axis=1, keepdims=True) / m
+    grads["dA" + str(L-1)] = np.dot(W[L].T, dZ)
 
-#     # if(i == (L-1)):
-#     #     dZ = A - Y
-#     # else:
+    for l in reversed(range(L-1)):
+        dZ = np.array(grads["dA" + str(l+1)], copy=True) # just converting dz to a correct object.
+        dZ[Z[l+1] <= 0] = 0
+        dW[l+1] = np.dot(dZ, A[l].T) / m
+        dB[l+1] = np.sum(dZ, axis=1, keepdims=True) / m
+        grads["dA" + str(l)] = np.dot(W[l+1].T, dZ)
 
+    cache['dW'] = dW
+    cache['dB'] = dB
 
-#     cache['dw'] = np.dot(dZ, X.T) / m
-#     cache['db'] = np.sum(dZ, axis=1, keepdims=True) / m
+def update_parameters(cache):
+    W = cache['W']
+    B = cache['B']
+    dW = cache['dW']
+    dB = cache['dB']
+
+    for i in range(cache['L']):
+        W[i+1] -= cache['alpha'] * dW[i+1]
+        B[i+1] -= cache['alpha'] * dB[i+1]
+
+    cache['W'] = W
+    cache['B'] = B
 
 main()
