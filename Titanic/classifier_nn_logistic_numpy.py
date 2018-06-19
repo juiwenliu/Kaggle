@@ -5,20 +5,23 @@ import numpy as np
 import re
 
 def main():
-    preProcessedData = preprocess_data()
-    cache = initialize_parameters(preProcessedData)
+    X, Y = preprocess_data()
+    cache = initialize_parameters(X, Y)
+    print("Iterations Cost") # Print progress with Cost
+    print("-----------------------------") # Print progress with Cost
 
-    for i in range(100000):
-        cache = make_forward_propagation(cache)
+    for i in range(10000): # Training iterations
+        make_forward_propagation(cache)
         compute_cost(cache)
-        cache = make_backward_propagation(cache)
-        cache = update_parameters(cache)
+        make_backward_propagation(cache)
+        update_parameters(cache)
 
-        if (np.remainder(i, 10000) == 0):
-            print(str(i) + ": Cost = " + str(cache['cost'])) # Print progress with Cost
+        if (np.remainder(i, 1000) == 0):
+            print(str(i).rjust(10) + " " + str(cache['cost'])) # Print progress with Cost
 
-    print('w: ' + str(cache['w'])) # Final w is what's needed for prediction
-    print('b: ' + str(cache['b'])) # Final w is what's needed for prediction
+    # W's and B's are needed for prediction
+    print('w: ' + str(cache['w']))
+    print('b: ' + str(cache['b']))
     predict(cache)
 
 def preprocess_data():
@@ -33,11 +36,12 @@ def preprocess_data():
     preProcessedData = preProcessedData[np.where(preProcessedData[:, 5] != '')] # Drop rows without data in Age column
     preProcessedData = preProcessedData[:, [1, 2, 4, 5, 6, 7, 9, 10]] # Pick selected 8 columns for training (has to drop column 0 because huge numbers (for example, 891) will easily overflow the sigmoid evaluation)
     preProcessedData = preProcessedData.astype(np.float) # Convert all cells to float
-    return preProcessedData
 
-def initialize_parameters(preProcessedData):
     X = copy.deepcopy(preProcessedData[:, [1, 2, 3, 4, 5, 6, 7]]).T # Make deep copy to avoid corrupting raw data
     Y = copy.deepcopy(preProcessedData[:, 0]).reshape(X.shape[1], -1).T # Make deep copy to avoid corrupting raw data. Reshape to address rank-1 array issue
+    return X, Y
+
+def initialize_parameters(X, Y):
     m = X.shape[1] # Training Set count
     nx = X.shape[0] # Feature count
     ny = 1 # Output layer unit count
@@ -77,14 +81,14 @@ def make_forward_propagation(cache):
     Z = np.dot(w, X) + b # Z = WX + B
 
     cache['A'] = np.reciprocal(1 + np.exp(-Z)) # Apply sigmoid function 1 / (1 + e^-Z)
-    return cache
 
 def compute_cost(cache):
     m = cache['m']
     A = cache['A']
     Y = cache['Y']
-    firstTerm = np.dot(Y,   np.log(A   + cache['epsilon']).T) # epsilon to avoid log(0) exception
-    secondTerm = np.dot(1-Y, np.log(1-A + cache['epsilon']).T) # epsilon to avoid log(0) exception
+    epsilon = cache['epsilon']
+    firstTerm  = np.dot(  Y, np.log(  A + epsilon).T) # epsilon to avoid log(0) exception
+    secondTerm = np.dot(1-Y, np.log(1-A + epsilon).T) # epsilon to avoid log(0) exception
     cost = -(firstTerm + secondTerm) / m # per Cross Entropy Cost function. See https://en.wikipedia.org/wiki/Cross_entropy
     cache['cost'] = np.squeeze(cost) # np.squeeze to turn one cell array into scalar
 
@@ -98,12 +102,10 @@ def make_backward_propagation(cache):
     dZ = A - Y
     cache['dw'] = np.dot(dZ, X.T) / m
     cache['db'] = np.sum(dZ, axis=1, keepdims=True) / m
-    return cache
 
 def update_parameters(cache):
     cache['w'] -= cache['alpha'] * cache['dw']
     cache['b'] -= cache['alpha'] * cache['db']
-    return cache
 
 def predict(cache):
     w = np.array([[-1.04715365, -2.63982776, -0.0442185110, -0.374088222, -0.0682812830, 0.00147806903, 0.567604116]])
