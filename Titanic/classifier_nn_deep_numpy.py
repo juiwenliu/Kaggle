@@ -7,22 +7,23 @@ import re
 def main():
     X, Y = preprocess_data()
     cache = initialize_parameters(X, Y)
-    print("Iterations Cost") # Print progress with Cost
-    print("-----------------------------") # Print progress with Cost
+    print('Iterations Cost') # Print progress with Cost
+    print('-----------------------------') # Print progress with Cost
 
     for i in range(cache['iterationsCount']): # Training iterations
         make_forward_propagation(cache)
         compute_cost(cache)
-
-        if (np.remainder(i, 1000) == 0):
-            print(str(i).rjust(10) + " " + str(cache['cost'])) # Print progress with Cost
-        
         make_backward_propagation(cache)
         update_parameters(cache)
+
+        if (np.remainder(i, 1000) == 0):
+            print(str(i).rjust(10) + ' ' + str(cache['cost'])) # Print progress with Cost
+
+    estimate_training_set_accuracy(cache)    
     
-    # W's and B's are needed for prediction
-    print(cache['W'])
-    print(cache['B'])
+    # W's aWnd B's are needed for prediction
+    print('W: ' + str(cache['B']))
+    print('B: ' + str(cache['B']))
 
 def preprocess_data():
     with open('train.csv','r') as f:
@@ -45,29 +46,39 @@ def initialize_parameters(X, Y):
     m = X.shape[1] # Training Set count
     N = [
         X.shape[0], # Feature count
-        64, # Layer 1 neural unit count
-        16, # Layer 1 neural unit count
-        8, # Layer 1 neural unit count
-        1  # Layer 3 neural unit (output) count
+        32, # Layer 1 neural unit count
+        16, # Layer 2 neural unit count
+        8, # Layer 3 neural unit count
+        1  # Layer 4 neural unit (output) count
     ]
     L = len(N) - 1 # neural network layers count. Minus one to exclude input layer
     W = [np.array([])] # empty array serves as dummy item
     B = [np.array([])] # empty array serves as dummy item
     dW = [np.array([])] # empty array serves as dummy item
     dB = [np.array([])] # empty array serves as dummy item
+    VdW = [np.array([])] # empty array serves as dummy item. VdW for ADAM optimization
+    VdB = [np.array([])] # empty array serves as dummy item. VdB for ADAM optimization
+    SdW = [np.array([])] # empty array serves as dummy item. SdW for ADAM optimization
+    SdB = [np.array([])] # empty array serves as dummy item. SdB for ADAM optimization
     Z = [np.array([])] # empty array serves as dummy item
     A = [X] # X is regarded as A0
-    alpha = 5 * np.power(10., -3) # Learning rate
-    epsilon = np.power(10., -10) # For divide-by-zero prevention and gradiant checking
-    iterationsCount = 3000000
+    alpha = np.power(10., -4) # Learning rate
+    beta1 = 0.9 # Exponential decay hyperparameter for the first moment estimates used in ADAM optimization
+    beta2 = 0.999 # Exponential decay hyperparameter for the second moment estimates used in ADAM optimization
+    epsilon = np.power(10., -10) # For divide-by-zero prevention and ADAM optimization
+    iterationsCount = 10000
 
     for i in range(1, L+1):
         W.append(np.random.randn(N[i], N[i-1]) * np.power(10., -2)) # Randomly initializing neuros. Factor 0.01 is to ensure the starting parameter to be small to stay on linear zone (crucial for gradiant decent on sigmoid)
         B.append(np.zeros((N[i], 1)))
-        dW.append(np.zeros((N[i], N[i-1])))
-        dB.append(np.zeros((N[i], 1)))
+        dW.append(np.zeros(W[i].shape))
+        dB.append(np.zeros(B[i].shape))
+        VdW.append(np.zeros(W[i].shape))
+        VdB.append(np.zeros(B[i].shape))
+        SdW.append(np.zeros(W[i].shape))
+        SdB.append(np.zeros(B[i].shape))
         Z.append(np.zeros((N[i], m)))
-        A.append(np.zeros((N[i], m)))
+        A.append(np.zeros(Z[i].shape))
 
     cache = {
         'X': X,
@@ -79,9 +90,15 @@ def initialize_parameters(X, Y):
         'B': B,
         'dW': dW,
         'dB': dB,
+        'VdW': VdW,
+        'VdB': VdB,
+        'SdW': SdW,
+        'SdB': SdB,
         'Z': Z,
         'A': A,
         'alpha': alpha,
+        'beta1': beta1,
+        'beta2': beta2,
         'epsilon': epsilon,
         'iterationsCount': iterationsCount
     }
@@ -97,10 +114,16 @@ def initialize_parameters(X, Y):
         print('B' + str(i) + ': ' + str(B[i].shape))
         print('dW' + str(i) + ': ' + str(dW[i].shape))
         print('dB' + str(i) + ': ' + str(dB[i].shape))
+        print('VdW' + str(i) + ': ' + str(VdW[i].shape))
+        print('VdB' + str(i) + ': ' + str(VdB[i].shape))
+        print('SdW' + str(i) + ': ' + str(SdW[i].shape))
+        print('SdB' + str(i) + ': ' + str(SdB[i].shape))
         print('Z' + str(i) + ': ' + str(Z[i].shape))
         print('A' + str(i) + ': ' + str(A[i].shape))
     
     print('alpha: ' + str(alpha))
+    print('beta1: ' + str(beta1))
+    print('beta2: ' + str(beta2))
     print('epsilon: ' + str(epsilon))
     return cache
 
@@ -156,23 +179,53 @@ def make_backward_propagation(cache):
     dZ = dAL * AL * (1 - AL) # element-wise multiplication
     dW[L] = np.dot(dZ, A[L-1].T) / m
     dB[L] = np.sum(dZ, axis=1, keepdims=True) / m
-    grads["dA" + str(L-1)] = np.dot(W[L].T, dZ)
+    grads['dA' + str(L-1)] = np.dot(W[L].T, dZ)
 
     # Sigmoid backward-prop implementation. For all hidden layers
     for l in reversed(range(L-1)):
-        dZ = np.array(grads["dA" + str(l+1)], copy=True) # just converting dz to a correct object.
+        dZ = np.array(grads['dA' + str(l+1)], copy=True) # just converting dz to a correct object.
         dZ[Z[l+1] <= 0] = 0 # essense of relu_backward(). When z <= 0, you should set dz to 0 as well. See https://github.com/andersy005/deep-learning-specialization-coursera/blob/master/01-Neural-Networks-and-Deep-Learning/week4/Programming%20Assignments/Building%20your%20Deep%20Neural%20Network%20-%20Step%20by%20Step/dnn_utils_v2.py
         dW[l+1] = np.dot(dZ, A[l].T) / m
         dB[l+1] = np.sum(dZ, axis=1, keepdims=True) / m
-        grads["dA" + str(l)] = np.dot(W[l+1].T, dZ)
+        grads['dA' + str(l)] = np.dot(W[l+1].T, dZ)
 
     cache['dW'] = dW
     cache['dB'] = dB
 
-# Update parameters using gradient descent
+# Update parameters using ADAM
 def update_parameters(cache):
-    cache['W'] -= np.multiply(cache['alpha'], cache['dW'])
-    cache['B'] -= np.multiply(cache['alpha'], cache['dB'])
+    L = cache['L']
+    W = cache['W']
+    B = cache['B']
+    dW = cache['dW']
+    dB = cache['dB']
+    VdW = cache['VdW']
+    VdB = cache['VdB']
+    SdW = cache['SdW']
+    SdB = cache['SdB']
+    alpha = cache['alpha']
+    beta1 = cache['beta1']
+    beta2 = cache['beta2']
+    epsilon = cache['epsilon']
 
+    for i in range(1, L+1):
+        VdW[i] = beta1 * VdW[i] + (1 - beta1) * dW[i]
+        VdB[i] = beta1 * VdB[i] + (1 - beta1) * dB[i]
+        SdW[i] = beta2 * SdW[i] + (1 - beta2) * np.power(dW[i], 2)
+        SdB[i] = beta2 * SdB[i] + (1 - beta2) * np.power(dB[i], 2)
+        W[i] -= alpha * VdW[i] / np.sqrt(SdW[i] + epsilon)
+        B[i] -= alpha * VdB[i] / np.sqrt(SdB[i] + epsilon)
+
+    cache['W'] = W
+    cache['B'] = B
+
+# Make rough estimation of accuracy on the training records with ages
+def estimate_training_set_accuracy(cache):
+    A = cache['A']
+    L = cache['L']
+    Y = cache['Y']
+    m = cache['m']
+
+    print('Rough accuracy on training set: ' + str(np.sum((np.abs(np.abs(A[L]) - Y) < 0.5).astype(int)) / float(m)))
 
 main()
