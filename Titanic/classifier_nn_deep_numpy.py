@@ -20,6 +20,7 @@ def main():
         make_backward_propagation(cache)
         update_parameters(cache)
     
+    # W's and B's are needed for prediction
     print(cache['W'])
     print(cache['B'])
 
@@ -103,6 +104,7 @@ def initialize_parameters(X, Y):
     print('epsilon: ' + str(epsilon))
     return cache
 
+# Implement forward propagation for the [LINEAR->RELU]*(L-1)->LINEAR->SIGMOID computation
 def make_forward_propagation(cache):
     L = cache['L']
     W = cache['W']
@@ -120,6 +122,7 @@ def make_forward_propagation(cache):
     cache['Z'] = Z
     cache['A'] = A
 
+# Implement the cost function defined per Cross Entropy Cost function. See https://en.wikipedia.org/wiki/Cross_entropy
 def compute_cost(cache): # Only compute top layer cost
     m = cache['m']
     A = cache['A']
@@ -128,11 +131,15 @@ def compute_cost(cache): # Only compute top layer cost
     epsilon = cache['epsilon']
     firstTerm  = np.dot(  Y, np.log(  A[L]+epsilon).T) # epsilon to avoid log(0) exception.
     secondTerm = np.dot(1-Y, np.log(1-A[L]+epsilon).T) # epsilon to avoid log(0) exception
-    cost = -(firstTerm + secondTerm) / m # per Cross Entropy Cost function. See https://en.wikipedia.org/wiki/Cross_entropy
+    cost = -(firstTerm + secondTerm) / m
     cache['cost'] = np.squeeze(cost) # np.squeeze to turn one cell array into scalar
 
+# Implement the backward propagation for the SIGMOID -> LINEAR -> [LINEAR->RELU] * (L-1) 
+# Implemented references:
+# 1. https://github.com/andersy005/deep-learning-specialization-coursera/blob/master/01-Neural-Networks-and-Deep-Learning/week4/Programming%20Assignments/Building%20your%20Deep%20Neural%20Network%20-%20Step%20by%20Step/Building%2Byour%2BDeep%2BNeural%2BNetwork%2B-%2BStep%2Bby%2BStep%2Bv3.ipynb
+# 2. https://github.com/andersy005/deep-learning-specialization-coursera/blob/master/01-Neural-Networks-and-Deep-Learning/week4/Programming%20Assignments/Building%20your%20Deep%20Neural%20Network%20-%20Step%20by%20Step/dnn_utils_v2.py
 def make_backward_propagation(cache):
-    grads = {}
+    grads = {} # Only carry dA's, since they are not needed in forward-props
     A = cache['A']
     L = cache['L']
     m = cache['m']
@@ -143,16 +150,18 @@ def make_backward_propagation(cache):
     dB = cache['dB']
     epsilon = cache['epsilon']
 	
+    # Sigmoid backward-prop implementation. Only for output layer
     dAL = -np.divide(Y, A[L]+epsilon) + np.divide(1-Y, 1-A[L]+epsilon)
-    s = 1/(1+np.exp(-Z[L]))
-    dZ = dAL * s * (1-s)
+    AL = np.reciprocal(1 + np.exp(-Z[L]))
+    dZ = dAL * AL * (1 - AL) # element-wise multiplication
     dW[L] = np.dot(dZ, A[L-1].T) / m
     dB[L] = np.sum(dZ, axis=1, keepdims=True) / m
     grads["dA" + str(L-1)] = np.dot(W[L].T, dZ)
 
+    # Sigmoid backward-prop implementation. For all hidden layers
     for l in reversed(range(L-1)):
         dZ = np.array(grads["dA" + str(l+1)], copy=True) # just converting dz to a correct object.
-        dZ[Z[l+1] <= 0] = 0
+        dZ[Z[l+1] <= 0] = 0 # essense of relu_backward(). When z <= 0, you should set dz to 0 as well. See https://github.com/andersy005/deep-learning-specialization-coursera/blob/master/01-Neural-Networks-and-Deep-Learning/week4/Programming%20Assignments/Building%20your%20Deep%20Neural%20Network%20-%20Step%20by%20Step/dnn_utils_v2.py
         dW[l+1] = np.dot(dZ, A[l].T) / m
         dB[l+1] = np.sum(dZ, axis=1, keepdims=True) / m
         grads["dA" + str(l)] = np.dot(W[l+1].T, dZ)
@@ -160,17 +169,10 @@ def make_backward_propagation(cache):
     cache['dW'] = dW
     cache['dB'] = dB
 
+# Update parameters using gradient descent
 def update_parameters(cache):
-    W = cache['W']
-    B = cache['B']
-    dW = cache['dW']
-    dB = cache['dB']
+    cache['W'] -= np.multiply(cache['alpha'], cache['dW'])
+    cache['B'] -= np.multiply(cache['alpha'], cache['dB'])
 
-    for i in range(cache['L']):
-        W[i+1] -= cache['alpha'] * dW[i+1]
-        B[i+1] -= cache['alpha'] * dB[i+1]
-
-    cache['W'] = W
-    cache['B'] = B
 
 main()
