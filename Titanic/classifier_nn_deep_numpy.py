@@ -7,6 +7,16 @@ import pandas as pd
 from scipy.special import expit
 
 def main():
+    """To run profiler (http://stefaanlippens.net/python_profiling_with_pstats_interactive_mode/):
+
+    1. Launch Command Prompt
+    2. Change Directory to cd c:\\Users\\Public\\Documents\\Projects\\Ml\\Kaggle\\Titanic\\Titanic
+    3. Run python -m cProfile -o c:\\Users\\Public\\Documents\\Projects\\Ml\\Kaggle\\Titanic\\Titanic\\Profiles\\Profile_2018_0625_2107.profile c:\\Users\\Public\\Documents\\Projects\\Ml\\Kaggle\\Titanic\\Titanic\\classifier_nn_deep_numpy.py
+    4. Run python -m pstats "c:\Users\Public\Documents\Projects\Ml\Kaggle\Titanic\Titanic\Profiles\Profile_2018_0625_2028.profile"
+    5. In profile stattistics browser:
+       - Run sort cumulative
+       - Run stats 10
+    """
     X, Y = preprocess_data()
     cache = initialize_parameters(X, Y)
     
