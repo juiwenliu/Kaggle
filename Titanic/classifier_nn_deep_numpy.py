@@ -12,16 +12,16 @@ def main():
     1. Launch Command Prompt
     2. Change Directory to cd c:\\Users\\Public\\Documents\\Projects\\Ml\\Kaggle\\Titanic\\Titanic
     3. Run python -m cProfile -o c:\\Users\\Public\\Documents\\Projects\\Ml\\Kaggle\\Titanic\\Titanic\\Profiles\\Profile_2018_0625_2107.profile c:\\Users\\Public\\Documents\\Projects\\Ml\\Kaggle\\Titanic\\Titanic\\classifier_nn_deep_numpy.py
-    4. Run python -m pstats "c:\Users\Public\Documents\Projects\Ml\Kaggle\Titanic\Titanic\Profiles\Profile_2018_0625_2028.profile"
+    4. Run python -m pstats "c:\\Users\\Public\\Documents\\Projects\\Ml\\Kaggle\\Titanic\\Titanic\\Profiles\\Profile_2018_0625_2028.profile"
     5. In profile stattistics browser:
        - Run sort cumulative
        - Run stats 10
     """
+    logger = initialize_system()
     X, Y = preprocess_data()
-    cache = initialize_parameters(X, Y)
+    cache = initialize_parameters(X, Y, logger)
     
     for i in range(cache['iterationsCount']): # Training iterations
-        logger = initialize_system()
         cache['currentIterationNumber'] = i
         make_forward_propagation(cache)
         compute_cost(cache, logger)
@@ -31,7 +31,7 @@ def main():
     estimate_training_set_accuracy(cache, logger)
 
 def initialize_system():
-    logName = 'Logs/Log_' + str(datetime.datetime.now().strftime('%Y_%m%d_%H%M_%S%f')) + '.txt'
+    logName = 'Logs/Log_' + str(datetime.datetime.now().strftime('%Y_%m%d_%H%M_%S%f')) + '.log'
     logger = logging.getLogger('logger')
     logging.basicConfig(filename=logName, level=logging.INFO)
     return logger
@@ -58,6 +58,7 @@ def preprocess_data():
     fareAverage = np.nanmean(fares)
     fareStdDev = np.nanstd(fares)
     preProcessedData[:, 9] = np.divide(fares - fareAverage, fareStdDev) + 1
+    preProcessedData[np.where(pd.isnull(preProcessedData[:, 9])), 9] = 0
 
     # In Embarked column, letters converted to digits
     preProcessedData[np.where(pd.isnull(preProcessedData[:, 11])), 11] = 2
@@ -70,10 +71,10 @@ def preprocess_data():
 
     return X, Y
     
-def initialize_parameters(X, Y):
+def initialize_parameters(X, Y, logger):
     np.random.seed(datetime.datetime.now().microsecond)
     m = X.shape[1]
-    N = [X.shape[0], 32, 8, Y.shape[0]]
+    N = [X.shape[0], 8, 8, 8, Y.shape[0]]
     L = len(N) - 1 # neural network layers count. Minus one to exclude input layer
     A = [X] # is regarded as A0, which doesn't count for number of Layers
 
@@ -109,7 +110,7 @@ def initialize_parameters(X, Y):
         'B': B,
         'dB': dB,
         'dW': dW,
-        'iterationsCount': np.power(10, 5) + 1,
+        'iterationsCount': 5 * np.power(10, 5) + 1,
         'L': L,
         'm': m,
         'N': N,
@@ -123,19 +124,21 @@ def initialize_parameters(X, Y):
         'Z': Z,
         'zAverage': zAverage,
         'zStdDev': zStdDev,
-        'alpha': 6 * np.power(10., -3), # Learning rate
-        'alphaDecay': 1 - np.power(10., -5), # decay rate on Learning Rate 
-        'beta1': 0.93, # Hyperparameter for the moment factor used in ADAM optimization
-        'beta2': 0.999, # Hyperparameter for the RMS Prop factor used in ADAM optimization
+        'alpha': 2.12 * np.power(10., -3), # Learning rate
+        'alphaDecay': 1 - np.power(10., -6), # decay rate on Learning Rate 
+        'beta1': 0.9, # Hyperparameter for the moment factor used in ADAM optimization
+        'beta2': 0.99, # Hyperparameter for the RMS Prop factor used in ADAM optimization
         'epsilon': np.power(10., -8) # Random small constant for axilliary use
     }
     
+    logger.info(cache)
     return cache
 
 # Implement forward propagation for the [LINEAR->RELU]*(L-1)->LINEAR->SIGMOID computation
 def make_forward_propagation(cache):
     A = cache['A']
     B = cache['B']
+    currentIterationNumber = cache['currentIterationNumber']
     L = cache['L']
     W = cache['W']
     Z = cache['Z']
@@ -146,10 +149,11 @@ def make_forward_propagation(cache):
         Z[i+1] = (np.dot(W[i+1], A[i]) + B[i+1]).astype(np.float32) # Z_l = W_l * A_l-1 + B_l
         
         if (i < L - 1): # For all hidden layers (Layer 1 ~ L-1)
-            zAverage[i+1] = np.array(np.average(Z[i+1], axis=1)).reshape(Z[i+1].shape[0], 1)
-            zStdDev[i+1] = np.array(np.std(Z[i+1], axis=1)).reshape(Z[i+1].shape[0], 1)
+            # if(np.remainder(currentIterationNumber, 100) == 0): # Evaluate mean and stdDev once in a while to reduce the computation burden
+            #     zAverage[i+1] = np.array(np.average(Z[i+1], axis=1)).reshape(Z[i+1].shape[0], 1)
+            #     zStdDev[i+1] = np.array(np.std(Z[i+1], axis=1)).reshape(Z[i+1].shape[0], 1)
 
-            Z[i+1] = np.divide(Z[i+1] - zAverage[i+1], zStdDev[i+1]) + 1 # Z Normalization to facilitate learning
+            # Z[i+1] = np.divide(Z[i+1] - zAverage[i+1], zStdDev[i+1]) + 1 # Z Normalization to facilitate learning
 
             # Optional verification to ensure Z entries collectively have average 0 and stdDev 1
             # assert(np.average(np.average(Z[i+1], axis=1)) - 1 < np.sqrt(cache['epsilon']))
