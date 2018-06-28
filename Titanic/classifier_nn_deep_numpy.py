@@ -124,10 +124,10 @@ def initialize_parameters(X, Y, logger):
         'Z': Z,
         'zAverage': zAverage,
         'zStdDev': zStdDev,
-        'alpha': 2.12 * np.power(10., -3), # Learning rate
+        'alpha': 4.84 * np.power(10., -3), # Learning rate
         'alphaDecay': 1 - np.power(10., -6), # decay rate on Learning Rate 
-        'beta1': 0.9, # Hyperparameter for the moment factor used in ADAM optimization
-        'beta2': 0.99, # Hyperparameter for the RMS Prop factor used in ADAM optimization
+        'beta1': 0.87, # Hyperparameter for the moment factor used in ADAM optimization
+        'beta2': 0.9987, # Hyperparameter for the RMS Prop factor used in ADAM optimization
         'epsilon': np.power(10., -8) # Random small constant for axilliary use
     }
     
@@ -150,13 +150,13 @@ def make_forward_propagation(cache):
         
         if (i < L - 1): # For all hidden layers (Layer 1 ~ L-1)
             # if(np.remainder(currentIterationNumber, 100) == 0): # Evaluate mean and stdDev once in a while to reduce the computation burden
-            #     zAverage[i+1] = np.array(np.average(Z[i+1], axis=1)).reshape(Z[i+1].shape[0], 1)
-            #     zStdDev[i+1] = np.array(np.std(Z[i+1], axis=1)).reshape(Z[i+1].shape[0], 1)
+            zAverage[i+1] = np.array(np.average(Z[i+1], axis=1)).reshape(Z[i+1].shape[0], 1)
+            zStdDev[i+1] = np.array(np.std(Z[i+1], axis=1)).reshape(Z[i+1].shape[0], 1)
 
-            # Z[i+1] = np.divide(Z[i+1] - zAverage[i+1], zStdDev[i+1]) + 1 # Z Normalization to facilitate learning
+            Z[i+1] = np.divide(Z[i+1] - zAverage[i+1], zStdDev[i+1]) # Z Normalization to facilitate learning
 
             # Optional verification to ensure Z entries collectively have average 0 and stdDev 1
-            # assert(np.average(np.average(Z[i+1], axis=1)) - 1 < np.sqrt(cache['epsilon']))
+            # assert(np.average(np.average(Z[i+1], axis=1)) < np.sqrt(cache['epsilon']))
             # assert(np.average(np.std(Z[i+1], axis=1)) - 1 < np.sqrt(cache['epsilon']))
 
             A[i+1] = np.maximum(0, Z[i+1]) # Apply ReLU function max(0, Z)
