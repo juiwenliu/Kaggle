@@ -20,11 +20,23 @@ def main():
     logger = initialize_system()
     X, Y = preprocess_data()
     cache = initialize_parameters(X, Y, logger)
+    adversaryStreakCounter = 0
+    favorableStreakCounter = 0
     
     for i in range(cache['iterationsCount']): # Training iterations
         cache['currentIterationNumber'] = i
         make_forward_propagation(cache)
         compute_cost(cache, logger)
+
+        if(cache['cost'] >= cache['cost_prev']):
+            adversaryStreakCounter += 1
+            favorableStreakCounter = 0
+            roll_back_parameters_retune_alpha(cache, adversaryStreakCounter)
+        else:
+            adversaryStreakCounter = 0
+            favorableStreakCounter += 1
+            cache['alpha'] = cache['alpha'] if favorableStreakCounter > 100 else cache['alpha'] * cache['alphaRecover']
+
         make_backward_propagation(cache)
         update_parameters(cache)
 
@@ -74,7 +86,7 @@ def preprocess_data():
 def initialize_parameters(X, Y, logger):
     np.random.seed(datetime.datetime.now().microsecond)
     m = X.shape[1]
-    N = [X.shape[0], 8, 8, 8, Y.shape[0]]
+    N = [X.shape[0], 32, 16, Y.shape[0]]
     L = len(N) - 1 # neural network layers count. Minus one to exclude input layer
     A = [X] # is regarded as A0, which doesn't count for number of Layers
 
@@ -108,9 +120,11 @@ def initialize_parameters(X, Y, logger):
     cache = {
         'A': A,
         'B': B,
+        'cost': np.power(10, 3), #random huge number
+        'cost_prev': np.power(10, 4), #random huge number
         'dB': dB,
         'dW': dW,
-        'iterationsCount': 5 * np.power(10, 5) + 1,
+        'iterationsCount': np.power(10, 6) + 1,
         'L': L,
         'm': m,
         'N': N,
@@ -124,10 +138,11 @@ def initialize_parameters(X, Y, logger):
         'Z': Z,
         'zAverage': zAverage,
         'zStdDev': zStdDev,
-        'alpha': 4.84 * np.power(10., -3), # Learning rate
-        'alphaDecay': 1 - np.power(10., -6), # decay rate on Learning Rate 
-        'beta1': 0.87, # Hyperparameter for the moment factor used in ADAM optimization
-        'beta2': 0.9987, # Hyperparameter for the RMS Prop factor used in ADAM optimization
+        'alpha': np.power(10., -2), # Learning rate
+        'alphaDecay': 1 - np.power(10., -4), # decay rate on Learning Rate for adversary progress
+        'alphaRecover': 1 + np.power(10., -4), # learning rate ramp-up rate for favorable progress
+        'beta1': 0.9, # Hyperparameter for the moment factor used in ADAM optimization
+        'beta2': 0.999, # Hyperparameter for the RMS Prop factor used in ADAM optimization
         'epsilon': np.power(10., -8) # Random small constant for axilliary use
     }
     
@@ -138,18 +153,19 @@ def initialize_parameters(X, Y, logger):
 def make_forward_propagation(cache):
     A = cache['A']
     B = cache['B']
-    currentIterationNumber = cache['currentIterationNumber']
     L = cache['L']
     W = cache['W']
     Z = cache['Z']
     zAverage = cache['zAverage']
     zStdDev = cache['zStdDev']
+
+    cache['A_prev'] = cache['A']
+    cache['Z_prev'] = cache['Z']
     
     for i in range(L):
         Z[i+1] = (np.dot(W[i+1], A[i]) + B[i+1]).astype(np.float32) # Z_l = W_l * A_l-1 + B_l
         
         if (i < L - 1): # For all hidden layers (Layer 1 ~ L-1)
-            # if(np.remainder(currentIterationNumber, 100) == 0): # Evaluate mean and stdDev once in a while to reduce the computation burden
             zAverage[i+1] = np.array(np.average(Z[i+1], axis=1)).reshape(Z[i+1].shape[0], 1)
             zStdDev[i+1] = np.array(np.std(Z[i+1], axis=1)).reshape(Z[i+1].shape[0], 1)
 
@@ -171,28 +187,59 @@ def make_forward_propagation(cache):
 # Implement the cost function defined per Cross Entropy Cost function. See https://en.wikipedia.org/wiki/Cross_entropy
 def compute_cost(cache, logger): # Only compute top layer cost
     currentIterationNumber = cache['currentIterationNumber']
-    
-    if(np.remainder(currentIterationNumber, 100) == 0):
-        A = cache['A']
-        B = cache['B']
-        iterationsCount = cache['iterationsCount']
-        L = cache['L']
-        m = cache['m']
-        W = cache['W']
-        Y = cache['Y']
-        epsilon = cache['epsilon']
-        
-        firstTerm = np.dot(Y, np.log(A[L] + epsilon).T) # epsilon to avoid log(0) exception.
-        secondTerm = np.dot(1-Y, np.log(1 - A[L] + epsilon).T) # epsilon to avoid log(0) exception.
-        cost = np.squeeze(-np.divide(firstTerm + secondTerm, m)) # np.squeeze to turn one cell array into scalar
-        print('#' + str(currentIterationNumber).rjust(8, '0') + ': ' + str(cost).ljust(20, ' ') + ' ' + str(cache['alpha']))
-        logger.info('#' + str(currentIterationNumber).rjust(8, '0') + ': ' + str(cost).ljust(20, ' ') + ' ' + str(cache['alpha'])) # Log progress with Cost
+    A = cache['A']
+    B = cache['B']
+    iterationsCount = cache['iterationsCount']
+    L = cache['L']
+    m = cache['m']
+    W = cache['W']
+    Y = cache['Y']
+    epsilon = cache['epsilon']
+
+    cache['cost_prev'] = cache['cost']
+
+    firstTerm = np.dot(Y, np.log(A[L] + epsilon).T) # epsilon to avoid log(0) exception.
+    secondTerm = np.dot(1-Y, np.log(1 - A[L] + epsilon).T) # epsilon to avoid log(0) exception.
+    cost = np.squeeze(-np.divide(firstTerm + secondTerm, m)) # np.squeeze to turn one cell array into scalar
+
+    cache['cost'] = cost
+
+    if (cost >= cache['cost_prev']):
+        flag = '          --'
+    else:
+        flag = '                ++'
+
+    if(np.remainder(currentIterationNumber, 1) == 0):
+        print('#' + str(currentIterationNumber).rjust(8, '0') + ': ' + str(cost).ljust(20, ' ') + ' ' + str(cache['alpha']) + flag)
+        logger.info('#' + str(currentIterationNumber).rjust(8, '0') + ': ' + str(cost).ljust(20, ' ') + ' ' + str(cache['alpha']))
 
         if(currentIterationNumber == iterationsCount - 1): # Final W's and B's are needed for prediction
             for i in range(L):
                 logger.info(W[i + 1])
                 logger.info(B[i + 1])
 
+def roll_back_parameters_retune_alpha(cache, adversaryStreakCounter):
+    cache['A'] = cache['A_prev']
+    cache['B'] = cache['B_prev']    
+    cache['cost'] = cache['cost_prev']    
+    cache['dB'] = cache['dB_prev']
+    cache['dW'] = cache['dW_prev']
+    cache['SdB'] = cache['SdB_prev']
+    cache['SdW'] = cache['SdW_prev']
+    cache['VdB'] = cache['VdB_prev']
+    cache['VdW'] = cache['VdW_prev']
+    cache['W'] = cache['W_prev']
+    cache['Z'] = cache['Z_prev']
+
+    if(np.remainder(adversaryStreakCounter, 100) == 0):
+        cache['alpha'] = cache['alpha'] * np.power(cache['alphaDecay'], 100)
+    elif(adversaryStreakCounter == 20):
+        cache['alpha'] = cache['alpha'] * np.power(cache['alphaDecay'], 5)
+    elif(np.remainder(cache['currentIterationNumber'], 10) == 0):
+        cache['alpha'] = cache['alpha'] * np.power(cache['alphaRecover'], 5)
+    else:
+        cache['alpha'] = cache['alpha'] * cache['alphaDecay']
+    
 # Implement the backward propagation for the SIGMOID -> LINEAR -> [LINEAR->RELU] * (L-1) 
 # Implemented references:
 # 1. https://github.com/andersy005/deep-learning-specialization-coursera/blob/master/01-Neural-Networks-and-Deep-Learning/week4/Programming%20Assignments/Building%20your%20Deep%20Neural%20Network%20-%20Step%20by%20Step/Building%2Byour%2BDeep%2BNeural%2BNetwork%2B-%2BStep%2Bby%2BStep%2Bv3.ipynb
@@ -208,6 +255,9 @@ def make_backward_propagation(cache):
     dW = cache['dW']
     dB = cache['dB']
     epsilon = cache['epsilon']
+
+    cache['dB_prev'] = cache['dB']
+    cache['dW_prev'] = cache['dW']
 
     # Sigmoid backward-prop implementation. Only for output layer
     dAL = -np.divide(Y, A[L]+epsilon) + np.divide(1-Y, 1-A[L]+epsilon)
@@ -240,12 +290,16 @@ def update_parameters(cache):
     VdB = cache['VdB']
     W = cache['W']
     alpha = cache['alpha']
-    alphaDecay = cache['alphaDecay']
     beta1 = cache['beta1']
     beta2 = cache['beta2']
     epsilon = cache['epsilon']
 
-    alpha *= alphaDecay # Gradually ramp down learning rate as closing in to min
+    cache['B_prev'] = B
+    cache['SdB_prev'] = SdB
+    cache['SdW_prev'] = SdW
+    cache['VdB_prev'] = VdB
+    cache['VdW_prev'] = VdW
+    cache['W_prev'] = W
     
     for i in range(L):
         VdW[i+1] = beta1 * VdW[i+1] + (1 - beta1) * dW[i+1]
@@ -258,7 +312,6 @@ def update_parameters(cache):
         bUpdateAddingMomentumElement = np.divide(VdB[i+1], bUpdateAddingRmsPropElement)
         wUpdateAddingAlpha = alpha * wUpdateAddingMomentumElement
         bUpdateAddingAlpha = alpha * bUpdateAddingMomentumElement
-        
         W[i+1] = W[i+1] - wUpdateAddingAlpha
         B[i+1] = B[i+1] - bUpdateAddingAlpha
 
@@ -268,7 +321,6 @@ def update_parameters(cache):
     cache['SdB'] = SdB
     cache['W'] = W
     cache['B'] = B
-    cache['alpha'] = alpha
 
 # Make rough estimation of accuracy on the training records with ages
 def estimate_training_set_accuracy(cache, logger):
