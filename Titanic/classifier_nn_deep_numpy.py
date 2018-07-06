@@ -38,26 +38,38 @@ def main():
                 cache['VdW_grand_roll_back'] = copy.deepcopy(cache['VdW_prev'])
                 cache['W_grand_roll_back'] = copy.deepcopy(cache['W_prev'])
                 cache['Z_grand_roll_back'] = copy.deepcopy(cache['Z_prev'])
-                # print('make backup ' + str(cache['W_grand_roll_back'][3][0, 0]) + ' ' + str(cache['A_grand_roll_back'][3][5, 5]))
 
             adversaryStreakCounter += 1
             favorableStreakCounter = 0
 
-            if (adversaryStreakCounter > 100):
+            if (adversaryStreakCounter > 200):
                 roll_back_parameters_retune_alpha(cache, adversaryStreakCounter)
 
-                if (np.remainder(adversaryStreakCounter, 200) == 0):
+                if (np.remainder(adversaryStreakCounter, 20) == 0):
                     make_backward_propagation(cache)
             else:
-                cache['cost'] = copy.deepcopy(cache['cost_prev'])
                 make_backward_propagation(cache)
+
+            cache['cost'] = copy.deepcopy(cache['cost_prev'])
         else:
+            cache['B_optimal'] = copy.deepcopy(cache['B'])
+            cache['W_optimal'] = copy.deepcopy(cache['W'])
             adversaryStreakCounter = 0
             favorableStreakCounter += 1
             cache['alpha'] = cache['alpha'] if favorableStreakCounter > 100 else cache['alpha'] * cache['alphaRecover']
             make_backward_propagation(cache)
 
         update_parameters(cache)
+
+        if (adversaryStreakCounter > 200 and np.remainder(adversaryStreakCounter, 20) == 0):
+            cache['A_mini_roll_back'] = copy.deepcopy(cache['A'])
+            cache['B_mini_roll_back'] = copy.deepcopy(cache['B'])
+            cache['SdB_mini_roll_back'] = copy.deepcopy(cache['SdB'])
+            cache['SdW_mini_roll_back'] = copy.deepcopy(cache['SdW'])
+            cache['VdB_mini_roll_back'] = copy.deepcopy(cache['VdB'])
+            cache['VdW_mini_roll_back'] = copy.deepcopy(cache['VdW'])
+            cache['W_mini_roll_back'] = copy.deepcopy(cache['W'])
+            cache['Z_mini_roll_back'] = copy.deepcopy(cache['Z'])
 
     estimate_training_set_accuracy(cache, logger)
 
@@ -105,7 +117,7 @@ def preprocess_data():
 def initialize_parameters(X, Y, logger):
     np.random.seed(datetime.datetime.now().microsecond)
     m = X.shape[1]
-    N = [X.shape[0], 32, 32, 8, 8, Y.shape[0]]
+    N = [X.shape[0], 64, 16, 4, Y.shape[0]]
     L = len(N) - 1 # neural network layers count. Minus one to exclude input layer
     A = [X] # is regarded as A0, which doesn't count for number of Layers
 
@@ -144,7 +156,7 @@ def initialize_parameters(X, Y, logger):
         'cost_rolledBack': 0,
         'dB': dB,
         'dW': dW,
-        'iterationsCount': np.power(10, 6) + 1,
+        'iterationsCount': np.power(10, 5) + 1,
         'L': L,
         'm': m,
         'N': N,
@@ -160,7 +172,7 @@ def initialize_parameters(X, Y, logger):
         'zStdDev': zStdDev,
         'alpha': np.power(10., -2), # Learning rate
         'alphaDecay': 1 - np.power(10., -3), # decay rate on Learning Rate for adversary progress
-        'alphaRecover': 1 + 5 * np.power(10., -4), # learning rate ramp-up rate for favorable progress
+        'alphaRecover': 1 + np.power(10., -4), # learning rate ramp-up rate for favorable progress
         'beta1': 0.9, # Hyperparameter for the moment factor used in ADAM optimization
         'beta2': 0.999, # Hyperparameter for the RMS Prop factor used in ADAM optimization
         'epsilon': np.power(10., -8) # Random small constant for axilliary use
@@ -189,7 +201,7 @@ def make_forward_propagation(cache):
             zAverage[i+1] = np.array(np.average(Z[i+1], axis=1)).reshape(Z[i+1].shape[0], 1)
             zStdDev[i+1] = np.array(np.std(Z[i+1], axis=1)).reshape(Z[i+1].shape[0], 1)
 
-            Z[i+1] = np.divide(Z[i+1] - zAverage[i+1], zStdDev[i+1]) # Z Normalization to facilitate learning
+            Z[i+1] = np.divide(Z[i+1] - 0.5 * zAverage[i+1], zStdDev[i+1]) # Z Normalization to facilitate learning
             A[i+1] = np.maximum(0, Z[i+1]) # Apply ReLU function max(0, Z)
         else: # For output layer (Layer L)
             A[L] = expit(Z[L]) # Apply sigmoid function 1 / (1 + e^-Z). Used to mitigate overflow of np.exp(). See http://arogozhnikov.github.io/2015/09/30/NumpyTipsAndTricks2.html
@@ -224,12 +236,15 @@ def compute_cost(cache, logger): # Only compute top layer cost
         logger.info('#' + str(currentIterationNumber).rjust(8, '0') + ': ' + str(cost).ljust(25, ' ') + ' ' + str(cache['alpha']).ljust(25, ' ') + ' ' + str(datetime.datetime.now()) + ' ' + flag)
 
         if(currentIterationNumber == iterationsCount - 1): # Final W's and B's are needed for prediction
+            logger.info('\n\n\n\n\n\n\n\n--------------------Optimal W--------------------')
             for i in range(L):
-                logger.info(W[i + 1])
-                logger.info(B[i + 1])
+                logger.info(cache['W_optimal'][i+1])
+            logger.info('\n\n\n\n--------------------Optimal B--------------------')
+            for i in range(L):
+                logger.info(cache['B_optimal'][i+1])
 
 def roll_back_parameters_retune_alpha(cache, adversaryStreakCounter):
-    if(adversaryStreakCounter == 101):
+    if(adversaryStreakCounter == 201 or cache['cost'] > 1.2 * cache['cost_prev']):
         cache['A'] = copy.deepcopy(cache['A_grand_roll_back'])
         cache['B'] = copy.deepcopy(cache['B_grand_roll_back'])
         cache['SdB'] = copy.deepcopy(cache['SdB_grand_roll_back'])
@@ -238,7 +253,16 @@ def roll_back_parameters_retune_alpha(cache, adversaryStreakCounter):
         cache['VdW'] = copy.deepcopy(cache['VdW_grand_roll_back'])
         cache['W'] = copy.deepcopy(cache['W_grand_roll_back'])
         cache['Z'] = copy.deepcopy(cache['Z_grand_roll_back'])
-        # print('grand roll back ' + str(cache['W_grand_roll_back'][3][0, 0]) + ' ' + str(cache['A_grand_roll_back'][3][5, 5]))
+    elif(np.remainder(adversaryStreakCounter, 20) == 1):
+
+        cache['A'] = copy.deepcopy(cache['A_mini_roll_back'])
+        cache['B'] = copy.deepcopy(cache['B_mini_roll_back'])
+        cache['SdB'] = copy.deepcopy(cache['SdB_mini_roll_back'])
+        cache['SdW'] = copy.deepcopy(cache['SdW_mini_roll_back'])
+        cache['VdB'] = copy.deepcopy(cache['VdB_mini_roll_back'])
+        cache['VdW'] = copy.deepcopy(cache['VdW_mini_roll_back'])
+        cache['W'] = copy.deepcopy(cache['W_mini_roll_back'])
+        cache['Z'] = copy.deepcopy(cache['Z_mini_roll_back'])
     else:
         cache['A'] = copy.deepcopy(cache['A_prev'])
         cache['B'] = copy.deepcopy(cache['B_prev'])
@@ -250,7 +274,7 @@ def roll_back_parameters_retune_alpha(cache, adversaryStreakCounter):
         cache['Z'] = copy.deepcopy(cache['Z_prev'])
 
     if(np.divide(np.abs(cache['cost'] - cache['cost_rolledBack']), cache['cost']) < np.power(10., -12)):
-        cache['alpha'] = 1
+        cache['alpha'] = 0.2
     elif(np.remainder(adversaryStreakCounter, 500) == 0):
         cache['alpha'] = np.divide(cache['alpha'], 2)
     elif(np.remainder(adversaryStreakCounter, 100) == 0):
@@ -263,7 +287,6 @@ def roll_back_parameters_retune_alpha(cache, adversaryStreakCounter):
         cache['alpha'] = cache['alpha'] * cache['alphaDecay']
 
     cache['cost_rolledBack'] = copy.deepcopy(cache['cost'])
-    cache['cost'] = copy.deepcopy(cache['cost_prev'])
     
 # Implement the backward propagation for the SIGMOID -> LINEAR -> [LINEAR->RELU] * (L-1) 
 # Implemented references:
