@@ -118,7 +118,7 @@ def preprocess_data():
 def initialize_parameters(X, Y, logger):
     np.random.seed(datetime.datetime.now().microsecond)
     m = X.shape[1]
-    N = [X.shape[0], 24, 24, 24, 24, Y.shape[0]]
+    N = [X.shape[0], 64, 64, 64, Y.shape[0]]
     L = len(N) - 1 # neural network layers count. Minus one to exclude input layer
     A = [X] # is regarded as A0, which doesn't count for number of Layers
 
@@ -153,13 +153,14 @@ def initialize_parameters(X, Y, logger):
         'A': A,
         'adversaryStreakLimit': 200,
         'B': B,
+        'B_optimal': None,
         'cost': np.power(10, 3), #random huge number
         'cost_prev': np.power(10, 4), #random huge number
         'cost_rolledBack': 0,
         'dB': dB,
         'dW': dW,
         'favorableStreakLimit': 100,
-        'iterationsCount': 5 * np.power(10, 5) + 1,
+        'iterationsCount': np.power(10, 5) + 1,
         'L': L,
         'm': m,
         'N': N,
@@ -168,6 +169,7 @@ def initialize_parameters(X, Y, logger):
         'VdB': VdB,
         'VdW': VdW,
         'W': W,
+        'W_optimal': None,
         'X': X,
         'Y': Y,
         'Z': Z,
@@ -233,10 +235,13 @@ def compute_cost(cache, logger): # Only compute top layer cost
     cache['cost'] = cost
 
 def record_progress(cache, logger):
+    B_optimal = cache['B_optimal']
     cost = cache['cost']
+    N = cache['N']
     cost_prev = cache['cost_prev']
     currentIterationNumber = cache['currentIterationNumber']
     L = cache['L']
+    W_optimal = cache['W_optimal']
     alpha = cache['alpha']
 
     if (cost >= cost_prev):
@@ -252,11 +257,13 @@ def record_progress(cache, logger):
         # Final W's and B's are needed for prediction
         logger.info('\n\n\n\n\n\n\n\n--------------------Optimal W--------------------')
         for i in range(L):
-            logger.info(cache['W_optimal'][i+1])
+            for j in range(N[i+1]):
+                for k in range(N[i]):
+                    logger.info(W_optimal[i+1][j, k])
 
         logger.info('\n\n\n\n--------------------Optimal B--------------------')
         for i in range(L):
-            logger.info(cache['B_optimal'][i+1])
+            logger.info(B_optimal[i+1])
 
 def roll_back_parameters_retune_alpha(cache, adversaryStreakCounter):
     if(adversaryStreakCounter == (cache['adversaryStreakLimit'] + 1) or cache['cost'] > 1.1 * cache['cost_prev']):
