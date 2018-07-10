@@ -234,9 +234,10 @@ def compute_cost(cache, logger): # Only compute top layer cost
     else:
         flag = '                ++'
 
-    if(np.remainder(currentIterationNumber, 1) == 0):
+    logger.info('#' + str(currentIterationNumber).rjust(8, '0') + ': ' + str(cost).ljust(25, ' ') + ' ' + str(cache['alpha']).ljust(25, ' ') + ' ' + str(datetime.datetime.now()) + ' ' + flag)
+
+    if(currentIterationNumber > 0 and np.remainder(currentIterationNumber, 1000) == 0):
         print('#' + str(currentIterationNumber).rjust(8, '0') + ': ' + str(cost).ljust(25, ' ') + ' ' + str(cache['alpha']).ljust(25, ' ') + ' ' + str(datetime.datetime.now()) + ' ' + flag)
-        logger.info('#' + str(currentIterationNumber).rjust(8, '0') + ': ' + str(cost).ljust(25, ' ') + ' ' + str(cache['alpha']).ljust(25, ' ') + ' ' + str(datetime.datetime.now()) + ' ' + flag)
 
         if(currentIterationNumber == iterationsCount - 1): # Final W's and B's are needed for prediction
             logger.info('\n\n\n\n\n\n\n\n--------------------Optimal W--------------------')
