@@ -54,10 +54,10 @@ def main():
         else:
             cache['B_optimal'] = copy.deepcopy(cache['B'])
             cache['W_optimal'] = copy.deepcopy(cache['W'])
+            cache['alpha'] = cache['alpha'] if favorableStreakCounter > cache['favorableStreakLimit'] else cache['alpha'] * (1 + np.divide(cache['alphaRecover'], adversaryStreakCounter + 1))
+            make_backward_propagation(cache)
             adversaryStreakCounter = 0
             favorableStreakCounter += 1
-            cache['alpha'] = cache['alpha'] if favorableStreakCounter > cache['favorableStreakLimit'] else cache['alpha'] * cache['alphaRecover']
-            make_backward_propagation(cache)
 
         update_parameters(cache)
 
@@ -174,7 +174,7 @@ def initialize_parameters(X, Y, logger):
         'zStdDev': zStdDev,
         'alpha': np.power(10., -2), # Learning rate
         'alphaDecay': 1 - np.power(10., -3), # decay rate on Learning Rate for adversary progress
-        'alphaRecover': 1 + np.power(10., -4), # learning rate ramp-up rate for favorable progress
+        'alphaRecover': np.power(10., -4), # learning rate ramp-up rate for favorable progress
         'beta1': 0.9, # Hyperparameter for the moment factor used in ADAM optimization
         'beta2': 0.999, # Hyperparameter for the RMS Prop factor used in ADAM optimization
         'epsilon': np.power(10., -8) # Random small constant for axilliary use
