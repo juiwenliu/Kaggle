@@ -192,6 +192,7 @@ def make_forward_propagation(cache):
     Z = cache['Z']
     zAverage = cache['zAverage']
     zStdDev = cache['zStdDev']
+    epsilon = cache['epsilon']
 
     cache['A_prev'] = copy.deepcopy(cache['A'])
     cache['Z_prev'] = copy.deepcopy(cache['Z'])
@@ -203,7 +204,7 @@ def make_forward_propagation(cache):
             zAverage[i+1] = np.array(np.average(Z[i+1], axis=1)).reshape(Z[i+1].shape[0], 1)
             zStdDev[i+1] = np.array(np.std(Z[i+1], axis=1)).reshape(Z[i+1].shape[0], 1)
 
-            Z[i+1] = np.divide(Z[i+1] - 0.5 * zAverage[i+1], zStdDev[i+1]) # Z Normalization to facilitate learning
+            Z[i+1] = np.divide(Z[i+1] - 0.5 * zAverage[i+1], zStdDev[i+1] + epsilon) # Z Normalization to facilitate learning
             A[i+1] = np.maximum(0, Z[i+1]) # Apply ReLU function max(0, Z)
         else: # For output layer (Layer L)
             A[L] = expit(Z[L]) # Apply sigmoid function 1 / (1 + e^-Z). Used to mitigate overflow of np.exp(). See http://arogozhnikov.github.io/2015/09/30/NumpyTipsAndTricks2.html
