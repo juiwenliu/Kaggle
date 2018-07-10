@@ -285,8 +285,6 @@ def roll_back_parameters_retune_alpha(cache, adversaryStreakCounter):
         cache['alpha'] = cache['alpha'] * np.power(cache['alphaDecay'], 100)
     elif(adversaryStreakCounter == 20):
         cache['alpha'] = cache['alpha'] * np.power(cache['alphaDecay'], 5)
-    elif(np.remainder(cache['currentIterationNumber'], 10) == 0):
-        cache['alpha'] = cache['alpha'] * np.power(cache['alphaRecover'], 5)
     else:
         cache['alpha'] = cache['alpha'] * cache['alphaDecay']
 
