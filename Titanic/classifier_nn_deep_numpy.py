@@ -42,7 +42,7 @@ def main():
             adversaryStreakCounter += 1
             favorableStreakCounter = 0
 
-            if (adversaryStreakCounter > 200):
+            if (adversaryStreakCounter > cache['adversaryStreakLimit']):
                 roll_back_parameters_retune_alpha(cache, adversaryStreakCounter)
 
                 if (np.remainder(adversaryStreakCounter, 20) == 0):
@@ -56,12 +56,12 @@ def main():
             cache['W_optimal'] = copy.deepcopy(cache['W'])
             adversaryStreakCounter = 0
             favorableStreakCounter += 1
-            cache['alpha'] = cache['alpha'] if favorableStreakCounter > 100 else cache['alpha'] * cache['alphaRecover']
+            cache['alpha'] = cache['alpha'] if favorableStreakCounter > cache['favorableStreakLimit'] else cache['alpha'] * cache['alphaRecover']
             make_backward_propagation(cache)
 
         update_parameters(cache)
 
-        if (adversaryStreakCounter > 200 and np.remainder(adversaryStreakCounter, 20) == 0):
+        if (adversaryStreakCounter > cache['adversaryStreakLimit'] and np.remainder(adversaryStreakCounter, 20) == 0):
             cache['A_mini_roll_back'] = copy.deepcopy(cache['A'])
             cache['B_mini_roll_back'] = copy.deepcopy(cache['B'])
             cache['SdB_mini_roll_back'] = copy.deepcopy(cache['SdB'])
@@ -150,12 +150,14 @@ def initialize_parameters(X, Y, logger):
 
     cache = {
         'A': A,
+        'adversaryStreakLimit': 200,
         'B': B,
         'cost': np.power(10, 3), #random huge number
         'cost_prev': np.power(10, 4), #random huge number
         'cost_rolledBack': 0,
         'dB': dB,
         'dW': dW,
+        'favorableStreakLimit': 100,
         'iterationsCount': np.power(10, 5) + 1,
         'L': L,
         'm': m,
@@ -244,7 +246,7 @@ def compute_cost(cache, logger): # Only compute top layer cost
                 logger.info(cache['B_optimal'][i+1])
 
 def roll_back_parameters_retune_alpha(cache, adversaryStreakCounter):
-    if(adversaryStreakCounter == 201 or cache['cost'] > 1.2 * cache['cost_prev']):
+    if(adversaryStreakCounter == (cache['adversaryStreakLimit'] + 1) or cache['cost'] > 1.2 * cache['cost_prev']):
         cache['A'] = copy.deepcopy(cache['A_grand_roll_back'])
         cache['B'] = copy.deepcopy(cache['B_grand_roll_back'])
         cache['SdB'] = copy.deepcopy(cache['SdB_grand_roll_back'])
