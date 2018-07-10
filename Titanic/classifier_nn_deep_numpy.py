@@ -27,6 +27,7 @@ def main():
         cache['currentIterationNumber'] = i
         make_forward_propagation(cache)
         compute_cost(cache, logger)
+        record_progress(cache, logger)
 
         if(cache['cost'] >= cache['cost_prev']):
             if(adversaryStreakCounter == 0):
@@ -211,44 +212,46 @@ def make_forward_propagation(cache):
 
 # Implement the cost function defined per Cross Entropy Cost function. See https://en.wikipedia.org/wiki/Cross_entropy
 def compute_cost(cache, logger): # Only compute top layer cost
-    currentIterationNumber = cache['currentIterationNumber']
     A = cache['A']
-    B = cache['B']
-    iterationsCount = cache['iterationsCount']
     L = cache['L']
     m = cache['m']
-    W = cache['W']
     Y = cache['Y']
     epsilon = cache['epsilon']
 
     cache['cost_prev'] = copy.deepcopy(cache['cost'])
-
     firstTerm = np.dot(Y, np.log(A[L] + epsilon).T) # epsilon to avoid log(0) exception.
     secondTerm = np.dot(1-Y, np.log(1 - A[L] + epsilon).T) # epsilon to avoid log(0) exception.
     cost = np.squeeze(-np.divide(firstTerm + secondTerm, m)) # np.squeeze to turn one cell array into scalar
-
     cache['cost'] = cost
 
-    if (cost >= cache['cost_prev']):
+def record_progress(cache, logger):
+    cost = cache['cost']
+    cost_prev = cache['cost_prev']
+    currentIterationNumber = cache['currentIterationNumber']
+    L = cache['L']
+    alpha = cache['alpha']
+
+    if (cost >= cost_prev):
         flag = '          --'
     else:
         flag = '                ++'
 
-    logger.info('#' + str(currentIterationNumber).rjust(8, '0') + ': ' + str(cost).ljust(25, ' ') + ' ' + str(cache['alpha']).ljust(25, ' ') + ' ' + str(datetime.datetime.now()) + ' ' + flag)
+    logger.info('#' + str(currentIterationNumber).rjust(8, '0') + ': ' + str(cost).ljust(25, ' ') + ' ' + str(alpha).ljust(25, ' ') + ' ' + str(datetime.datetime.now()) + ' ' + flag)
 
     if(currentIterationNumber > 0 and np.remainder(currentIterationNumber, 1000) == 0):
-        print('#' + str(currentIterationNumber).rjust(8, '0') + ': ' + str(cost).ljust(25, ' ') + ' ' + str(cache['alpha']).ljust(25, ' ') + ' ' + str(datetime.datetime.now()) + ' ' + flag)
+        print('#' + str(currentIterationNumber).rjust(8, '0') + ': ' + str(cost).ljust(25, ' ') + ' ' + str(alpha).ljust(25, ' ') + ' ' + str(datetime.datetime.now()) + ' ' + flag)
 
-        if(currentIterationNumber == iterationsCount - 1): # Final W's and B's are needed for prediction
-            logger.info('\n\n\n\n\n\n\n\n--------------------Optimal W--------------------')
-            for i in range(L):
-                logger.info(cache['W_optimal'][i+1])
-            logger.info('\n\n\n\n--------------------Optimal B--------------------')
-            for i in range(L):
-                logger.info(cache['B_optimal'][i+1])
+        # Final W's and B's are needed for prediction
+        logger.info('\n\n\n\n\n\n\n\n--------------------Optimal W--------------------')
+        for i in range(L):
+            logger.info(cache['W_optimal'][i+1])
+
+        logger.info('\n\n\n\n--------------------Optimal B--------------------')
+        for i in range(L):
+            logger.info(cache['B_optimal'][i+1])
 
 def roll_back_parameters_retune_alpha(cache, adversaryStreakCounter):
-    if(adversaryStreakCounter == (cache['adversaryStreakLimit'] + 1) or cache['cost'] > 1.2 * cache['cost_prev']):
+    if(adversaryStreakCounter == (cache['adversaryStreakLimit'] + 1) or cache['cost'] > 1.1 * cache['cost_prev']):
         cache['A'] = copy.deepcopy(cache['A_grand_roll_back'])
         cache['B'] = copy.deepcopy(cache['B_grand_roll_back'])
         cache['SdB'] = copy.deepcopy(cache['SdB_grand_roll_back'])
