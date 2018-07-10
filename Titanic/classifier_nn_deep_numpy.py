@@ -118,7 +118,7 @@ def preprocess_data():
 def initialize_parameters(X, Y, logger):
     np.random.seed(datetime.datetime.now().microsecond)
     m = X.shape[1]
-    N = [X.shape[0], 32, 32, 32, Y.shape[0]]
+    N = [X.shape[0], 24, 24, 24, 24, Y.shape[0]]
     L = len(N) - 1 # neural network layers count. Minus one to exclude input layer
     A = [X] # is regarded as A0, which doesn't count for number of Layers
 
@@ -159,7 +159,7 @@ def initialize_parameters(X, Y, logger):
         'dB': dB,
         'dW': dW,
         'favorableStreakLimit': 100,
-        'iterationsCount': np.power(10, 5) + 1,
+        'iterationsCount': 5 * np.power(10, 5) + 1,
         'L': L,
         'm': m,
         'N': N,
@@ -178,8 +178,8 @@ def initialize_parameters(X, Y, logger):
         'alphaRecover': np.power(10., -4), # learning rate ramp-up rate for favorable progress
         'beta1': 0.9, # Hyperparameter for the moment factor used in ADAM optimization
         'beta2': 0.999, # Hyperparameter for the RMS Prop factor used in ADAM optimization
-        'epsilon': np.power(10., -8) # Random small constant for axilliary use
-        # 'lambd': 0.1 # L2 regularization
+        'epsilon': np.power(10., -8), # Random small constant for axilliary use
+        'lambd': 0.1 # L2 regularization
     }
     
     logger.info(cache)
@@ -219,19 +219,17 @@ def compute_cost(cache, logger): # Only compute top layer cost
     W = cache['W']
     Y = cache['Y']
     epsilon = cache['epsilon']
+    lambd = cache['lambd']
     regularizationCostL2 = 0
     cache['cost_prev'] = copy.deepcopy(cache['cost'])
 
     for i in range(L):
         regularizationCostL2 += np.sum(np.square(W[i+1]))
 
-    # regularizationCostL2 = np.divide(regularizationCostL2 * lambd, 2 * m)
-
+    regularizationCostL2 = np.divide(regularizationCostL2 * lambd, 2 * m)
     firstTerm = np.dot(Y, np.log(A[L] + epsilon).T) # epsilon to avoid log(0) exception.
     secondTerm = np.dot(1-Y, np.log(1 - A[L] + epsilon).T) # epsilon to avoid log(0) exception.
-    # cost = np.squeeze(-np.divide(firstTerm + secondTerm, m)) + regularizationCostL2 # np.squeeze to turn one cell array into scalar
-    cost = np.squeeze(-np.divide(firstTerm + secondTerm, m)) # np.squeeze to turn one cell array into scalar
-    
+    cost = np.squeeze(-np.divide(firstTerm + secondTerm, m)) + regularizationCostL2 # np.squeeze to turn one cell array into scalar
     cache['cost'] = cost
 
 def record_progress(cache, logger):
@@ -319,6 +317,7 @@ def make_backward_propagation(cache):
     dW = cache['dW']
     dB = cache['dB']
     epsilon = cache['epsilon']
+    lambd = cache['lambd']
 
     cache['dB_prev'] = copy.deepcopy(cache['dB'])
     cache['dW_prev'] = copy.deepcopy(cache['dW'])
@@ -336,8 +335,7 @@ def make_backward_propagation(cache):
     for l in reversed(range(1, L)):
         dA = np.dot(W[l+1].T, grads['dZ' + str(l+1)])
         dZ = np.multiply(dA, np.int64(A[l] > 0))
-        # dW[l] = np.divide(np.dot(dZ, A[l-1].T), m) + np.divide(lambd * W[l], m)
-        dW[l] = np.divide(np.dot(dZ, A[l-1].T), m)
+        dW[l] = np.divide(np.dot(dZ, A[l-1].T), m) + np.divide(lambd * W[l], m)
         dB[l] = np.divide(np.sum(dZ, axis=1, keepdims=True), m)
         grads['dZ' + str(l)] = dZ
 
