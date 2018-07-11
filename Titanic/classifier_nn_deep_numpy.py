@@ -36,15 +36,12 @@ def main():
             adversaryStreakCounter += 1
             favorableStreakCounter = 0
 
-            if (adversaryStreakCounter > cache['adversaryStreakLimit']):
+            if (adversaryStreakCounter > cache['adversaryStreakLimit'] and np.remainder(adversaryStreakCounter, 20) != 0):
                 roll_back_parameters_retune_alpha(cache, adversaryStreakCounter)
-
-                if (np.remainder(adversaryStreakCounter, 20) == 0):
-                    make_backward_propagation(cache)
             else:
                 make_backward_propagation(cache)
 
-            cache['cost'] = copy.deepcopy(cache['cost_prev'])
+            cache['cost'] = copy.deepcopy(cache['cost_prev']) # Keep passing (for now) absolutely lowest cost down the iterations
         else:
             cache['B_optimal'] = copy.deepcopy(cache['B'])
             cache['W_optimal'] = copy.deepcopy(cache['W'])
@@ -229,11 +226,7 @@ def record_progress(cache, logger):
     L = cache['L']
     W_optimal = cache['W_optimal']
     alpha = cache['alpha']
-
-    if (cost >= cost_prev):
-        flag = '          --'
-    else:
-        flag = '                ++'
+    flag = '          --' if cost >= cost_prev else '                ++'
 
     logger.info('#' + str(currentIterationNumber).rjust(8, '0') + ': ' + str(cost).ljust(25, ' ') + ' ' + str(alpha).ljust(25, ' ') + ' ' + str(datetime.datetime.now()) + ' ' + flag)
 
