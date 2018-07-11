@@ -61,6 +61,7 @@ def initialize_system():
     logName = 'Logs/Log_' + str(datetime.datetime.now().strftime('%Y_%m%d_%H%M_%S%f')) + '.log'
     logger = logging.getLogger('logger')
     logging.basicConfig(filename=logName, level=logging.INFO)
+    np.set_printoptions(threshold=np.nan) # set threshold to nan to print out complete array per https://stackoverflow.com/questions/1987694/how-to-print-the-full-numpy-array
     return logger
 
 def preprocess_data():
@@ -230,19 +231,15 @@ def record_progress(cache, logger):
 
     logger.info('#' + str(currentIterationNumber).rjust(8, '0') + ': ' + str(cost).ljust(25, ' ') + ' ' + str(alpha).ljust(25, ' ') + ' ' + str(datetime.datetime.now()) + ' ' + flag)
 
-    if(currentIterationNumber > 0 and np.remainder(currentIterationNumber, 1000) == 0):
+    if(np.remainder(currentIterationNumber, 1000) == 0):
         print('#' + str(currentIterationNumber).rjust(8, '0') + ': ' + str(cost).ljust(25, ' ') + ' ' + str(alpha).ljust(25, ' ') + ' ' + str(datetime.datetime.now()) + ' ' + flag)
 
-        # Final W's and B's are needed for prediction
-        logger.info('\n\n\n\n\n\n\n\n--------------------Optimal W--------------------')
-        for i in range(L):
-            for j in range(N[i+1]):
-                for k in range(N[i]):
-                    logger.info(W_optimal[i+1][j, k])
-
-        logger.info('\n\n\n\n--------------------Optimal B--------------------')
-        for i in range(L):
-            logger.info(B_optimal[i+1])
+        if(currentIterationNumber != 0):
+            # Final W's and B's are needed for prediction
+            logger.info('\n\n\n\n\n\n\n\n--------------------Optimal W--------------------')
+            logger.info(cache['W_optimal'])
+            logger.info('\n\n\n\n--------------------Optimal B--------------------')
+            logger.info(cache['B_optimal'])
 
 def roll_back_parameters_retune_alpha(cache, adversaryStreakCounter):
     if(adversaryStreakCounter == (cache['adversaryStreakLimit'] + 1) or cache['cost'] > 1.1 * cache['cost_prev']):
