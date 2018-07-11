@@ -219,13 +219,10 @@ def compute_cost(cache, logger): # Only compute top layer cost
     cache['cost'] = cost
 
 def record_progress(cache, logger):
-    B_optimal = cache['B_optimal']
     cost = cache['cost']
     N = cache['N']
     cost_prev = cache['cost_prev']
     currentIterationNumber = cache['currentIterationNumber']
-    L = cache['L']
-    W_optimal = cache['W_optimal']
     alpha = cache['alpha']
     flag = '          --' if cost >= cost_prev else '                ++'
 
