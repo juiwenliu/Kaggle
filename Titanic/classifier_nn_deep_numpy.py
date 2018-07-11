@@ -31,14 +31,7 @@ def main():
 
         if(cache['cost'] >= cache['cost_prev']):
             if(adversaryStreakCounter == 0):
-                cache['A_grand_roll_back'] = copy.deepcopy(cache['A_prev'])
-                cache['B_grand_roll_back'] = copy.deepcopy(cache['B_prev'])
-                cache['SdB_grand_roll_back'] = copy.deepcopy(cache['SdB_prev'])
-                cache['SdW_grand_roll_back'] = copy.deepcopy(cache['SdW_prev'])
-                cache['VdB_grand_roll_back'] = copy.deepcopy(cache['VdB_prev'])
-                cache['VdW_grand_roll_back'] = copy.deepcopy(cache['VdW_prev'])
-                cache['W_grand_roll_back'] = copy.deepcopy(cache['W_prev'])
-                cache['Z_grand_roll_back'] = copy.deepcopy(cache['Z_prev'])
+                copy_parameters(cache, '_prev', '_grand_roll_back') # Backup the parameters which yield (for now) absolutely lowest cost
 
             adversaryStreakCounter += 1
             favorableStreakCounter = 0
@@ -63,14 +56,7 @@ def main():
         update_parameters(cache)
 
         if (adversaryStreakCounter > cache['adversaryStreakLimit'] and np.remainder(adversaryStreakCounter, 20) == 0):
-            cache['A_mini_roll_back'] = copy.deepcopy(cache['A'])
-            cache['B_mini_roll_back'] = copy.deepcopy(cache['B'])
-            cache['SdB_mini_roll_back'] = copy.deepcopy(cache['SdB'])
-            cache['SdW_mini_roll_back'] = copy.deepcopy(cache['SdW'])
-            cache['VdB_mini_roll_back'] = copy.deepcopy(cache['VdB'])
-            cache['VdW_mini_roll_back'] = copy.deepcopy(cache['VdW'])
-            cache['W_mini_roll_back'] = copy.deepcopy(cache['W'])
-            cache['Z_mini_roll_back'] = copy.deepcopy(cache['Z'])
+            copy_parameters(cache, '', '_mini_roll_back') # Allow keeping iterating forward once in a while despite adversary streak condition
 
     estimate_training_set_accuracy(cache, logger)
 
@@ -267,33 +253,11 @@ def record_progress(cache, logger):
 
 def roll_back_parameters_retune_alpha(cache, adversaryStreakCounter):
     if(adversaryStreakCounter == (cache['adversaryStreakLimit'] + 1) or cache['cost'] > 1.1 * cache['cost_prev']):
-        cache['A'] = copy.deepcopy(cache['A_grand_roll_back'])
-        cache['B'] = copy.deepcopy(cache['B_grand_roll_back'])
-        cache['SdB'] = copy.deepcopy(cache['SdB_grand_roll_back'])
-        cache['SdW'] = copy.deepcopy(cache['SdW_grand_roll_back'])
-        cache['VdB'] = copy.deepcopy(cache['VdB_grand_roll_back'])
-        cache['VdW'] = copy.deepcopy(cache['VdW_grand_roll_back'])
-        cache['W'] = copy.deepcopy(cache['W_grand_roll_back'])
-        cache['Z'] = copy.deepcopy(cache['Z_grand_roll_back'])
+        copy_parameters(cache, '_grand_roll_back', '')
     elif(np.remainder(adversaryStreakCounter, 20) == 1):
-
-        cache['A'] = copy.deepcopy(cache['A_mini_roll_back'])
-        cache['B'] = copy.deepcopy(cache['B_mini_roll_back'])
-        cache['SdB'] = copy.deepcopy(cache['SdB_mini_roll_back'])
-        cache['SdW'] = copy.deepcopy(cache['SdW_mini_roll_back'])
-        cache['VdB'] = copy.deepcopy(cache['VdB_mini_roll_back'])
-        cache['VdW'] = copy.deepcopy(cache['VdW_mini_roll_back'])
-        cache['W'] = copy.deepcopy(cache['W_mini_roll_back'])
-        cache['Z'] = copy.deepcopy(cache['Z_mini_roll_back'])
+        copy_parameters(cache, '_mini_roll_back', '')
     else:
-        cache['A'] = copy.deepcopy(cache['A_prev'])
-        cache['B'] = copy.deepcopy(cache['B_prev'])
-        cache['SdB'] = copy.deepcopy(cache['SdB_prev'])
-        cache['SdW'] = copy.deepcopy(cache['SdW_prev'])
-        cache['VdB'] = copy.deepcopy(cache['VdB_prev'])
-        cache['VdW'] = copy.deepcopy(cache['VdW_prev'])
-        cache['W'] = copy.deepcopy(cache['W_prev'])
-        cache['Z'] = copy.deepcopy(cache['Z_prev'])
+        copy_parameters(cache, '_prev', '')
 
     if(np.divide(np.abs(cache['cost'] - cache['cost_rolledBack']), cache['cost']) < np.power(10., -12)):
         cache['alpha'] = 0.2
@@ -389,7 +353,16 @@ def estimate_training_set_accuracy(cache, logger):
     L = cache['L']
     Y = cache['Y']
     m = cache['m']
-
     logger.info('Rough accuracy on training set: ' + str(np.sum((np.abs(np.abs(A[L]) - Y) < 0.5).astype(int)) / float(m)))
+
+def copy_parameters(cache, sourcePostFix, destinationPostFix):
+    cache['A' + destinationPostFix] = copy.deepcopy(cache['A' + sourcePostFix])
+    cache['B' + destinationPostFix] = copy.deepcopy(cache['B' + sourcePostFix])
+    cache['SdB' + destinationPostFix] = copy.deepcopy(cache['SdB' + sourcePostFix])
+    cache['SdW' + destinationPostFix] = copy.deepcopy(cache['SdW' + sourcePostFix])
+    cache['VdB' + destinationPostFix] = copy.deepcopy(cache['VdB' + sourcePostFix])
+    cache['VdW' + destinationPostFix] = copy.deepcopy(cache['VdW' + sourcePostFix])
+    cache['W' + destinationPostFix] = copy.deepcopy(cache['W' + sourcePostFix])
+    cache['Z' + destinationPostFix] = copy.deepcopy(cache['Z' + sourcePostFix])
 
 main()
