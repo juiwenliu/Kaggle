@@ -102,7 +102,7 @@ def preprocess_data():
 def initialize_parameters(X, Y, logger):
     np.random.seed(datetime.datetime.now().microsecond)
     m = X.shape[1]
-    N = [X.shape[0], 64, 64, 64, Y.shape[0]]
+    N = [X.shape[0], 9, 9, 9, 9, 9, Y.shape[0]]
     L = len(N) - 1 # neural network layers count. Minus one to exclude input layer
     A = [X] # is regarded as A0, which doesn't count for number of Layers
 
@@ -148,6 +148,7 @@ def initialize_parameters(X, Y, logger):
         'L': L,
         'm': m,
         'N': N,
+        'residualUnitSize': 3,
         'SdB': SdB,
         'SdW': SdW,
         'VdB': VdB,
@@ -176,12 +177,12 @@ def make_forward_propagation(cache):
     A = cache['A']
     B = cache['B']
     L = cache['L']
+    residualUnitSize = cache['residualUnitSize']
     W = cache['W']
     Z = cache['Z']
     zAverage = cache['zAverage']
     zStdDev = cache['zStdDev']
     epsilon = cache['epsilon']
-
     cache['A_prev'] = copy.deepcopy(cache['A'])
     cache['Z_prev'] = copy.deepcopy(cache['Z'])
     
@@ -189,6 +190,9 @@ def make_forward_propagation(cache):
         Z[i+1] = (np.dot(W[i+1], A[i]) + B[i+1]).astype(np.float32) # Z_l = W_l * A_l-1 + B_l
         
         if (i < L - 1): # For all hidden layers (Layer 1 ~ L-1)
+            if(np.remainder(i+1, residualUnitSize) == 0): # Residual Units (need to have same dimensions)
+                Z[i+1] += A[i-1].astype(np.float32)
+
             zAverage[i+1] = np.array(np.average(Z[i+1], axis=1)).reshape(Z[i+1].shape[0], 1)
             zStdDev[i+1] = np.array(np.std(Z[i+1], axis=1)).reshape(Z[i+1].shape[0], 1)
 
